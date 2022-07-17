@@ -6,11 +6,10 @@ type exval =
   | BoolV of bool
   (* 関数閉包を表す型 *)
   | ProcV of id * exp * dnval Environment.t ref
-  | DProcV of id * exp
   (* エラーを表す型*)
   | ExceptV of string
-  | NilV
-  | ConsV of exval * exval
+(* | NilV
+   | ConsV of exval * exval *)
 
 and dnval = exval
 
@@ -21,15 +20,16 @@ exception Error of string
 let err s = raise (Error s)
 
 (* 式を評価した値を string に変換する関数 *)
-let rec string_of_exval = function
+let string_of_exval = function
   | IntV i -> string_of_int i
   | BoolV b -> string_of_bool b
-  | ProcV (_, _, _) -> "<fun>"
-  | DProcV (_, _) -> "<dfun>"
+  (* TODO *)
+  | ProcV (id, exp, dnval) -> "()"
+  (* | DProcV (_, _) -> "<dfun>" *)
   (* エラー時の値ExceptVを出力する際は元のエラー文に"ERROR: "を付けます。 *)
   | ExceptV s -> "ERROR: " ^ s
-  | NilV -> "[]"
-  | ConsV (i, e) -> string_of_exval i ^ " :: " ^ string_of_exval e
+(* | NilV -> "[]"
+   | ConsV (i, e) -> string_of_exval i ^ " :: " ^ string_of_exval e *)
 
 (* 式を評価した値を出力する関数 *)
 let pp_val v = print_string (string_of_exval v)
@@ -43,10 +43,10 @@ let apply_prim op arg1 arg2 =
   | Mult, _, _ -> err "Both arguments must be integer: *"
   | Lt, IntV i1, IntV i2 -> BoolV (i1 < i2)
   | Lt, _, _ -> err "Both arguments must be integer: <"
-  | Andand, BoolV i1, BoolV i2 -> BoolV (i1 && i2)
-  | Andand, _, _ -> err "Both arguments must be boolean: &&"
-  | Barbar, BoolV i1, BoolV i2 -> BoolV (i1 || i2)
-  | Barbar, _, _ -> err "Both arguments must be boolean: ||"
+(* | Andand, BoolV i1, BoolV i2 -> BoolV (i1 && i2)
+   | Andand, _, _ -> err "Both arguments must be boolean: &&"
+   | Barbar, BoolV i1, BoolV i2 -> BoolV (i1 || i2)
+   | Barbar, _, _ -> err "Both arguments must be boolean: ||" *)
 
 (* 式を評価する関数、現在の環境と式を引数にとる *)
 let rec eval_exp env = function
@@ -56,26 +56,10 @@ let rec eval_exp env = function
       with Environment.Not_bound -> err ("Variable not bound: " ^ x))
   | ILit i -> IntV i
   | BLit b -> BoolV b
-  | BinOp (op, exp1, exp2) -> (
-      match op with
-      | Andand ->
-          let check = eval_exp env exp1 in
-          if check = BoolV false then BoolV false
-          else
-            let arg1 = eval_exp env exp1 in
-            let arg2 = eval_exp env exp2 in
-            apply_prim op arg1 arg2
-      | Barbar ->
-          let check = eval_exp env exp1 in
-          if check = BoolV true then BoolV true
-          else
-            let arg1 = eval_exp env exp1 in
-            let arg2 = eval_exp env exp2 in
-            apply_prim op arg1 arg2
-      | _ ->
-          let arg1 = eval_exp env exp1 in
-          let arg2 = eval_exp env exp2 in
-          apply_prim op arg1 arg2)
+  | BinOp (op, exp1, exp2) ->
+      let arg1 = eval_exp env exp1 in
+      let arg2 = eval_exp env exp2 in
+      apply_prim op arg1 arg2
   | IfExp (exp1, exp2, exp3) -> (
       let test = eval_exp env exp1 in
       match test with
@@ -88,7 +72,7 @@ let rec eval_exp env = function
       eval_exp (Environment.extend id value env) exp2
   | FunExp (id, exp) -> ProcV (id, exp, ref env)
   (* dfunのクロージャ。宣言時での環境は必要ないので含めていない *)
-  | DFunExp (id, exp) -> DProcV (id, exp)
+  (* | DFunExp (id, exp) -> DProcV (id, exp) *)
   | AppExp (exp1, exp2) -> (
       let funval = eval_exp env exp1 in
       let arg = eval_exp env exp2 in
@@ -97,33 +81,30 @@ let rec eval_exp env = function
           (* 静的束縛の場合、fun 式の宣言時点での環境を使って評価を行う *)
           let newenv = Environment.extend id arg !env' in
           eval_exp newenv body
-      | DProcV (id, body) ->
-          let newenv = Environment.extend id arg env in
-          eval_exp newenv body
       | _ -> err "Non-function value is applied")
   | LetRecExp (id, para, exp1, exp2) ->
       let dummyenv = ref Environment.empty in
       let newenv = Environment.extend id (ProcV (para, exp1, dummyenv)) env in
       dummyenv := newenv;
       eval_exp newenv exp2
-  | NilExp -> NilV
-  | ConsExp (exp1, exp2) ->
-      let head = eval_exp env exp1 in
-      let rest = eval_exp env exp2 in
-      ConsV (head, rest)
-  | MatchExp (exp1, exp2, id1, id2, exp3) -> (
-      if id1 = id2 then err "Head of list must be different from rest"
-      else
-        let matcharg = eval_exp env exp1 in
-        let value1 = eval_exp env exp2 in
-        match matcharg with
-        | NilV -> value1
-        | ConsV (head, rest) ->
-            let newenv =
-              Environment.extend id2 rest (Environment.extend id1 head env)
-            in
-            eval_exp newenv exp3
-        | _ -> err "Value after match must be Nil or Cons")
+(* | NilExp -> NilV
+   | ConsExp (exp1, exp2) ->
+       let head = eval_exp env exp1 in
+       let rest = eval_exp env exp2 in
+       ConsV (head, rest)
+   | MatchExp (exp1, exp2, id1, id2, exp3) -> (
+       if id1 = id2 then err "Head of list must be different from rest"
+       else
+         let matcharg = eval_exp env exp1 in
+         let value1 = eval_exp env exp2 in
+         match matcharg with
+         | NilV -> value1
+         | ConsV (head, rest) ->
+             let newenv =
+               Environment.extend id2 rest (Environment.extend id1 head env)
+             in
+             eval_exp newenv exp3
+         | _ -> err "Value after match must be Nil or Cons") *)
 
 (* 式・宣言を評価した際の、束縛された変数・新しい環境・束縛された変数の値を求める関数 *)
 let eval_decl env = function

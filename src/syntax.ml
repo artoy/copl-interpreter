@@ -8,7 +8,7 @@ let err s = raise (Error s)
 type id = string
 
 (* 二項演算子を表す型 *)
-type binOp = Plus | Mult | Lt | Andand | Barbar
+type binOp = Plus | Mult | Lt
 
 (* 式の抽象構文木を表す型 *)
 type exp =
@@ -20,13 +20,13 @@ type exp =
   | LetExp of id * exp * exp
   | FunExp of id * exp
   (* 動的束縛の構文を表す型 *)
-  | DFunExp of id * exp
+  (* | DFunExp of id * exp *)
   | AppExp of exp * exp
   (* let rec式の構文です。 *)
   | LetRecExp of id * id * exp * exp
-  | NilExp
-  | ConsExp of exp * exp
-  | MatchExp of exp * exp * id * id * exp
+(* | NilExp
+   | ConsExp of exp * exp
+   | MatchExp of exp * exp * id * id * exp *)
 
 (* 宣言を含む抽象構文木を表す型 *)
 type program =
@@ -40,13 +40,10 @@ type program =
 type tyvar = int
 
 (* 型を表す型 *)
-type ty =
-  | TyInt
-  | TyBool
-  | TyVar of tyvar
-  | TyFun of ty * ty
-  | TyList of ty
-  | TyExcept of string
+type ty = TyInt | TyBool | TyVar of tyvar | TyFun of ty * ty
+
+(* | TyList of ty *)
+(* | TyExcept of string *)
 
 (* 式中の型変数を全て求める関数。freevar って名前だし自由変数かも？ *)
 let rec freevar_ty ty =
@@ -58,7 +55,7 @@ let rec freevar_ty ty =
   | TyVar t -> MySet.singleton t
   (* TyFunの引数中に出現する全ての型変数の集合の和集合を返します。 *)
   | TyFun (l, r) -> MySet.union (freevar_ty l) (freevar_ty r)
-  | TyList t -> freevar_ty t
+(* | TyList t -> freevar_ty t *)
 
 (* 型を出力する際に使う関数 *)
 let rec string_of_ty ty =
@@ -105,7 +102,7 @@ let rec string_of_ty ty =
       match l with
       | TyFun (_, _) -> "(" ^ string_of_ty l ^ ")" ^ " -> " ^ string_of_ty r
       | _ -> string_of_ty l ^ " -> " ^ string_of_ty r)
-  | TyList t -> string_of_ty t ^ " list"
+(* | TyList t -> string_of_ty t ^ " list" *)
 
 (* 型を出力する関数 *)
 let pp_ty ty =

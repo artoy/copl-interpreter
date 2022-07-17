@@ -13,18 +13,18 @@ let rec read_eval_print env tyenv =
     | _ -> Exception "syntax error"
   in
   (* 型推論を実行 *)
-  let ty =
-    try ty_decl tyenv decl with
-    | Failure s -> Exception s
-    | _ -> Exception "syntax error"
-  in
+  (* let ty =
+       try ty_decl tyenv decl with
+       | Failure s -> Exception s
+       | _ -> Exception "syntax error"
+     in *)
   (* 次の環境と、宣言の場合は束縛された変数とその値を求める。式の場合は次の環境と式を評価した値を求める *)
   let id, newenv, v =
     try eval_decl env decl with Error s -> ("", env, ExceptV s)
   in
   (* 宣言の場合は束縛された変数とその値、式の場合は式を評価した値を出力する *)
   Printf.printf "val %s : " id;
-  pp_ty ty;
+  (* pp_ty ty; *)
   print_string " = ";
   pp_val v;
   print_newline ();
