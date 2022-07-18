@@ -1,6 +1,5 @@
 {
 let reservedWords = [
-  (* Keywords *)
   ("else", Parser.ELSE);
   ("false", Parser.FALSE);
   ("if", Parser.IF);
@@ -10,8 +9,6 @@ let reservedWords = [
   ("let", Parser.LET);
   ("fun", Parser.FUN);
   ("rec", Parser.REC);
-  (* ("match", Parser.MATCH);
-  ("with", Parser.WITH); *)
 ]
 }
 
@@ -28,15 +25,8 @@ rule main = parse
 | "+" { Parser.PLUS }
 | "*" { Parser.MULT }
 | "<" { Parser.LT }
-| "(*" { comment 1 lexbuf }
 | "=" { Parser.EQ }
 | "->" { Parser.RARROW }
-(* | "[]" { Parser.NIL }
-| "::" { Parser.APPEND }
-| "|" { Parser.BAR }
-| "[" { Parser.LBOX }
-| "]" { Parser.RBOX }
-| ";" { Parser.SEMI } *)
 
 | ['a'-'z'] ['a'-'z' '0'-'9' '_' '\'']*
     { let id = Lexing.lexeme lexbuf in
@@ -46,9 +36,3 @@ rule main = parse
       _ -> Parser.ID id
     }
 | eof { exit 0 }
-and comment n = parse
-| "(*" { comment (n+1) lexbuf }
-| "*)" { if (n=1) then (main lexbuf) else (comment (n-1) lexbuf) }
-| _ { comment n lexbuf }
-
-
