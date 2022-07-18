@@ -18,7 +18,7 @@ rule main = parse
   [' ' '\009' '\012' '\n']+     { main lexbuf }
 
 | "-"? ['0'-'9']+
-    { Parser.INTV (int_of_string (Lexing.lexeme lexbuf)) }
+    { Parser.INT (int_of_string (Lexing.lexeme lexbuf)) }
 
 | "(" { Parser.LPAREN }
 | ")" { Parser.RPAREN }
@@ -39,6 +39,6 @@ rule main = parse
       try
         List.assoc id reservedWords
       with
-      _ -> Parser.ID id
+      _ -> Parser.VAR id
     }
 | eof { exit 0 }

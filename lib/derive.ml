@@ -12,8 +12,12 @@ type rule =
   | ETimes of env * exp * exp * value * rule * rule * rule
   | ELt of env * exp * exp * value * rule * rule * rule
   | EVar1 of env * exp * value
-  | Evar2 of env * exp * value * env
+  | EVar2 of env * exp * value * env
   | ELet of env * var * exp * exp * value * rule * rule
+  | EFun of env * var * exp
+  | EApp of env * exp * exp * value * rule * rule * rule
+  | ELetRec of env * var * var * exp * exp * value * rule
+  | EAppRec of env * exp * exp * value * rule * rule * rule
   | BPlus of judgement
   | BMinus of judgement
   | BTimes of judgement
@@ -28,10 +32,10 @@ let rec derive_exp env e v =
       let d1 = derive_exp env e1 test in
       match test with
       | BoolV true ->
-          let d2 = derive_exp env e2 in
+          let d2 = derive_exp env e2 v in
           EIfT (env, e1, e2, e3, v, d1, d2)
       | BoolV false ->
-          let d3 = derive_exp env e3 in
+          let d3 = derive_exp env e3 v in
           EIfF (env, e1, e2, e3, v, d1, d3)
       | _ -> err "Test expression must be boolean: if")
   | BinOp (op, e1, e2) -> (
@@ -58,12 +62,31 @@ let rec derive_exp env e v =
       | Cons (rest, id, value) ->
           if x = id && v = value then EVar1 (env, Var x, v)
           else if x = id then err "The bound value is wrong"
-          else Evar2 (env, Var x, v, rest))
+          else EVar2 (env, Var x, v, rest))
   | LetExp (id, e1, e2) ->
       let v1 = eval_exp env e1 in
       let d1 = derive_exp env e1 v1 in
       let d2 = derive_exp (Cons (env, id, v1)) e2 v in
       ELet (env, id, e1, e2, v, d1, d2)
+  | FunExp (id, e) -> EFun (env, id, e)
+  | AppExp (e1, e2) -> (
+      let v1 = eval_exp env e1 in
+      let v2 = eval_exp env e2 in
+      let d1 = derive_exp env e1 v1 in
+      let d2 = derive_exp env e2 v2 in
+      match v1 with
+      | Closure (env', id, body) ->
+          let d3 = derive_exp (Cons (env', id, v2)) body v in
+          EApp (env, e1, e2, v, d1, d2, d3)
+      | RecClosure (env', id, para, body) ->
+          let d3 = derive_exp (Cons (Cons (env', id, v1), para, v2)) body v in
+          EAppRec (env, e1, e2, v, d1, d2, d3)
+      | _ -> err "Non-function value is applied")
+  | LetRecExp (id1, id2, e1, e2) ->
+      let d =
+        derive_exp (Cons (env, id1, RecClosure (env, id1, id2, e1))) e2 v
+      in
+      ELetRec (env, id1, id2, e1, e2, v, d)
 
 and derive_judgement j =
   match j with

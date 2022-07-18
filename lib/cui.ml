@@ -1,4 +1,5 @@
 open Syntax
+open Derive
 
 let rec read_derive_print _ =
   print_string "# ";

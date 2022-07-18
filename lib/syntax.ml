@@ -29,10 +29,10 @@ and exp =
 (* 判断を表す型 *)
 type judgement =
   | Eval of env * exp * value
-  | PlusJ of int * int * value
-  | MinusJ of int * int * value
-  | MultJ of int * int * value
-  | LtJ of int * int * value
+  | PlusJ of value * value * value
+  | MinusJ of value * value * value
+  | MultJ of value * value * value
+  | LtJ of value * value * value
 
 exception Not_bound
 
