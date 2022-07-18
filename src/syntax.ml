@@ -6,8 +6,8 @@ type prim = Plus | Minus | Mult | Lt
 
 (* 値を表す型 *)
 type value =
-  | ILit of int
-  | BLit of bool
+  | IntV of int
+  | BoolV of bool
   | Closure of env * var * exp
   | RecClosure of env * var * var * exp
 
@@ -29,7 +29,15 @@ and exp =
 (* 判断を表す型 *)
 type judgement =
   | Eval of env * exp * value
-  | PlusJ of int * int * int
-  | MinusJ of int * int * int
-  | MultJ of int * int * int
-  | LtJ of int * int * bool
+  | PlusJ of int * int * value
+  | MinusJ of int * int * value
+  | MultJ of int * int * value
+  | LtJ of int * int * value
+
+exception Not_bound
+
+(* 環境から変数が束縛されている値を求める関数 *)
+(* NOTE: 変数が複数の値に束縛されている場合は、抽象構文木の最も右側・外側の値を返す *)
+let rec lookup x = function
+  | Empty -> raise Not_bound
+  | Cons (rest, var, value) -> if var = x then value else lookup x rest

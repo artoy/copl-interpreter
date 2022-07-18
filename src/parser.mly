@@ -28,9 +28,9 @@ Expr :
   | LPAREN e=Expr RPAREN { e }
 
 Value :
-    i=INT { ILit i }
-  | TRUE   { BLit true }
-  | FALSE  { BLit false }
+    i=INT { IntV i }
+  | TRUE   { BoolV true }
+  | FALSE  { BoolV false }
   | LPAREN env=Env RPAREN LBOX FUN x=VAR RARROW e=Expr RBOX { Closure(env, x, e) }
   | LPAREN env=Env RPAREN LBOX REC x1=VAR EQ FUN x2=VAR RARROW e=Expr RBOX { RecClosure(env, x1, x2, e) }
 
