@@ -17,10 +17,47 @@ open Syntax
 %type <Syntax.judgement> toplevel
 %%
 
+// NOTE: evalto を使わない判断は扱わないものとする
 toplevel :
   env=Env VDASH e=Expr EVALTO v=Value SEMISEMI { Eval(env, e, v) }
 
 Expr :
+  e=LTExpr { e }
+
+LTExpr :
+    l=PExpr LT r=PExpr { BinOp (Lt, l, r) }
+  | e=PExpr { e }
+
+PExpr :
+    l=PExpr PLUS r=MExpr { BinOp (Plus, l, r) }
+    l=PExpr MINUS r=MExpr { BinOp (Minus, l, r) }
+  | e=MExpr { e }
+
+MExpr :
+    l=MExpr MULT r=SyntacticExpr { BinOp (Mult, l, r) }
+  | e=SyntacticExpr { e }
+
+SyntacticExpr :
+    e=IfExpr { e }
+  | e=LetExpr { e }
+  | e=FunExpr { e }
+  | e=AppExpr { e }
+
+IfExpr :
+    IF c=Expr THEN t=Expr ELSE e=Expr { IfExp (c, t, e) }
+
+LetExpr :
+    LET x=ID EQ e1=Expr IN e2=Expr { LetExp (x, e1, e2) }
+  | LET REC x1=ID EQ FUN x2=ID RARROW e1=Expr IN e2=Expr { LetRecExp (x1, x2, e1, e2) }
+
+FunExpr :
+    FUN x=ID RARROW e=Expr { FunExp (x, e) }
+
+AppExpr :
+    e1=AppExpr e2=AExpr { AppExp (e1, e2) }
+  | e=AExpr { e }
+
+AExpr :
     i=INT { IExp i }
   | TRUE   { BExp true }
   | FALSE  { BExp false }
