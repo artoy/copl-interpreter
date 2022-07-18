@@ -98,5 +98,5 @@ and derive_judgement j =
 
 (* 導出を出力する関数 *)
 (* TODO *)
-let rec pp_derivation n function =
+let rec pp_derivation n = function
   | EInt (env, i, v) -> 
