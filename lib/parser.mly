@@ -30,7 +30,7 @@ LTExpr :
 
 PExpr :
     l=PExpr PLUS r=MExpr { BinOp (Plus, l, r) }
-    l=PExpr MINUS r=MExpr { BinOp (Minus, l, r) }
+  | l=PExpr MINUS r=MExpr { BinOp (Minus, l, r) }
   | e=MExpr { e }
 
 MExpr :
@@ -47,11 +47,11 @@ IfExpr :
     IF c=Expr THEN t=Expr ELSE e=Expr { IfExp (c, t, e) }
 
 LetExpr :
-    LET x=ID EQ e1=Expr IN e2=Expr { LetExp (x, e1, e2) }
-  | LET REC x1=ID EQ FUN x2=ID RARROW e1=Expr IN e2=Expr { LetRecExp (x1, x2, e1, e2) }
+    LET x=VAR EQ e1=Expr IN e2=Expr { LetExp (x, e1, e2) }
+  | LET REC x1=VAR EQ FUN x2=VAR RARROW e1=Expr IN e2=Expr { LetRecExp (x1, x2, e1, e2) }
 
 FunExpr :
-    FUN x=ID RARROW e=Expr { FunExp (x, e) }
+    FUN x=VAR RARROW e=Expr { FunExp (x, e) }
 
 AppExpr :
     e1=AppExpr e2=AExpr { AppExp (e1, e2) }
