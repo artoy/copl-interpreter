@@ -19,7 +19,8 @@ open Syntax
 
 // NOTE: evalto を使わない判断は扱わないものとする
 toplevel :
-  env=Env VDASH e=Expr EVALTO v=Value SEMISEMI { Eval(env, e, v) }
+    env=Env VDASH e=Expr EVALTO v=Value SEMISEMI { Eval(env, e, v) }
+  | VDASH e=Expr EVALTO v=Value SEMISEMI { Eval(Empty, e, v) }
 
 Expr :
   e=LTExpr { e }

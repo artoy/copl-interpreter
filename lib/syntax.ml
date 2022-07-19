@@ -80,7 +80,7 @@ and string_of_exp = function
   | LetExp (id, e1, e2) ->
       "let " ^ id ^ " = " ^ string_of_exp e1 ^ " in " ^ string_of_exp e2
   | FunExp (id, e) -> "fun " ^ id ^ " -> " ^ string_of_exp e
-  | AppExp (e1, e2) -> string_of_exp e1 ^ " " ^ string_of_exp e2
+  | AppExp (e1, e2) -> string_of_exp e1 ^ " (" ^ string_of_exp e2 ^ ")"
   | LetRecExp (id1, id2, e1, e2) ->
       "let rec " ^ id1 ^ " = fun " ^ id2 ^ " -> " ^ string_of_exp e1 ^ " in "
       ^ string_of_exp e2

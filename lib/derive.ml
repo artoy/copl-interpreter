@@ -60,11 +60,11 @@ let rec derive_exp env e v =
       match env with
       | Empty -> err "Not bound"
       | Cons (rest, id, value) ->
-          if x = id && v = value then EVar1 (env, id, v)
+          if x = id && v = value then EVar1 (env, x, v)
           else if x = id then err "The bound value is wrong"
           else
             let d = derive_exp rest e v in
-            EVar2 (env, id, v, d))
+            EVar2 (env, x, v, d))
   | LetExp (id, e1, e2) ->
       let v1 = eval_exp env e1 in
       let d1 = derive_exp env e1 v1 in
@@ -253,8 +253,8 @@ let rec pp_derivation n = function
       print_string s
   | EApp (env, e1, e2, v, d1, d2, d3) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp e1 ^ " "
-        ^ string_of_exp e2 ^ " evalto " ^ string_of_value v ^ " by E-App {"
+        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp e1 ^ " ("
+        ^ string_of_exp e2 ^ ") evalto " ^ string_of_value v ^ " by E-App {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;
@@ -282,8 +282,8 @@ let rec pp_derivation n = function
       print_string s2
   | EAppRec (env, e1, e2, v, d1, d2, d3) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp e1 ^ " "
-        ^ string_of_exp e2 ^ " evalto " ^ string_of_value v ^ " by E-AppRec {"
+        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp e1 ^ " ("
+        ^ string_of_exp e2 ^ ") evalto " ^ string_of_value v ^ " by E-AppRec {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;
@@ -298,14 +298,14 @@ let rec pp_derivation n = function
       print_newline ();
       print_string s2
   | BPlus j ->
-      let s = string_of_judgement j ^ " by B-Plus {}" in
+      let s = n_space n ^ string_of_judgement j ^ " by B-Plus {}" in
       print_string s
   | BMinus j ->
-      let s = string_of_judgement j ^ " by B-Minus {}" in
+      let s = n_space n ^ string_of_judgement j ^ " by B-Minus {}" in
       print_string s
   | BTimes j ->
-      let s = string_of_judgement j ^ " by B-Times {}" in
+      let s = n_space n ^ string_of_judgement j ^ " by B-Times {}" in
       print_string s
   | BLt j ->
-      let s = string_of_judgement j ^ " by B-Lt {}" in
+      let s = n_space n ^ string_of_judgement j ^ " by B-Lt {}" in
       print_string s
