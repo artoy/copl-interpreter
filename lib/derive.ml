@@ -97,6 +97,4 @@ and derive_judgement j =
   | LtJ (_, _, _) -> BLt j
 
 (* 導出を出力する関数 *)
-(* TODO *)
-let rec pp_derivation n = function
-  | EInt (env, i, v) -> 
+let rec pp_derivation n = function EInt (env, i, v) -> ()

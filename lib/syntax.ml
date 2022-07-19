@@ -41,3 +41,41 @@ exception Not_bound
 let rec lookup x = function
   | Empty -> raise Not_bound
   | Cons (rest, var, value) -> if var = x then value else lookup x rest
+
+let string_of_prim = function
+  | Plus -> "+"
+  | Minus -> "-"
+  | Mult -> "*"
+  | Lt -> "<"
+
+let rec string_of_value = function
+  | IntV i -> string_of_int i
+  | BoolV b -> string_of_bool b
+  | Closure (env, id, e) ->
+      "(" ^ string_of_env env ^ ")[fun " ^ id ^ " -> " ^ string_of_exp e ^ "]"
+  | RecClosure (env, id, para, e) ->
+      "(" ^ string_of_env env ^ ")[rec " ^ id ^ " = fun " ^ para ^ " -> "
+      ^ string_of_exp e ^ "]"
+
+and string_of_env = function
+  | Cons (Empty, var, value) -> var ^ " = " ^ string_of_value value
+  | Cons (rest, var, value) ->
+      string_of_env rest ^ ", " ^ var ^ " = " ^ string_of_value value
+  | Empty -> ""
+
+and string_of_exp = function
+  | IExp i -> string_of_int i
+  | BExp b -> string_of_bool b
+  | Var v -> v
+  | BinOp (op, e1, e2) ->
+      string_of_exp e1 ^ " " ^ string_of_prim op ^ " " ^ string_of_exp e2
+  | IfExp (e1, e2, e3) ->
+      "if " ^ string_of_exp e1 ^ " then " ^ string_of_exp e2 ^ " else "
+      ^ string_of_exp e3
+  | LetExp (id, e1, e2) ->
+      "let " ^ id ^ " = " ^ string_of_exp e1 ^ " in " ^ string_of_exp e2
+  | FunExp (id, e) -> "fun " ^ id ^ " -> " ^ string_of_exp e
+  | AppExp (e1, e2) -> string_of_exp e1 ^ " " ^ string_of_exp e2
+  | LetRecExp (id1, id2, e1, e2) ->
+      "let rec " ^ id1 ^ " = fun " ^ id2 ^ " -> " ^ string_of_exp e1 ^ " in "
+      ^ string_of_exp e2
