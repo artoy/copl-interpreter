@@ -1,10 +1,5 @@
 open Syntax
 
-exception Error of string
-
-(* エラーを発生させる関数 *)
-let err s = raise (Error s)
-
 let apply_prim op arg1 arg2 =
   match (op, arg1, arg2) with
   | Plus, IntV i1, IntV i2 -> IntV (i1 + i2)

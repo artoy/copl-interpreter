@@ -230,4 +230,82 @@ let rec pp_derivation n = function
       print_newline ();
       print_string s2
   | ELet (env, id, e1, e2, v, d1, d2) ->
-    
+      let s1 =
+        n_space n ^ string_of_env env ^ " |- let " ^ id ^ " = "
+        ^ string_of_exp e1 ^ " in " ^ string_of_exp e2 ^ " evalto "
+        ^ string_of_value v ^ " by E-Let {"
+      in
+      let s2 = n_space n ^ "}" in
+      print_string s1;
+      print_newline ();
+      pp_derivation (n + 1) d1;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d2;
+      print_newline ();
+      print_string s2
+  | EFun (env, id, e) ->
+      let s =
+        n_space n ^ string_of_env env ^ " |- fun " ^ id ^ " -> "
+        ^ string_of_exp e ^ " evalto (" ^ string_of_env env ^ ")[fun " ^ id
+        ^ " -> " ^ string_of_exp e ^ "]" ^ " by E-Fun {}"
+      in
+      print_string s
+  | EApp (env, e1, e2, v, d1, d2, d3) ->
+      let s1 =
+        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp e1 ^ " "
+        ^ string_of_exp e2 ^ " evalto " ^ string_of_value v ^ " by E-App {"
+      in
+      let s2 = n_space n ^ "}" in
+      print_string s1;
+      print_newline ();
+      pp_derivation (n + 1) d1;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d2;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d3;
+      print_newline ();
+      print_string s2
+  | ELetRec (env, id, para, e1, e2, v, d) ->
+      let s1 =
+        n_space n ^ string_of_env env ^ " |- let rec " ^ id ^ " = fun " ^ para
+        ^ " -> " ^ string_of_exp e1 ^ " in " ^ string_of_exp e2 ^ " evalto "
+        ^ string_of_value v ^ " by E-LetRec {"
+      in
+      let s2 = n_space n ^ "}" in
+      print_string s1;
+      print_newline ();
+      pp_derivation (n + 1) d;
+      print_newline ();
+      print_string s2
+  | EAppRec (env, e1, e2, v, d1, d2, d3) ->
+      let s1 =
+        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp e1 ^ " "
+        ^ string_of_exp e2 ^ " evalto " ^ string_of_value v ^ " by E-AppRec {"
+      in
+      let s2 = n_space n ^ "}" in
+      print_string s1;
+      print_newline ();
+      pp_derivation (n + 1) d1;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d2;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d3;
+      print_newline ();
+      print_string s2
+  | BPlus j ->
+      let s = string_of_judgement j ^ " by B-Plus {}" in
+      print_string s
+  | BMinus j ->
+      let s = string_of_judgement j ^ " by B-Minus {}" in
+      print_string s
+  | BTimes j ->
+      let s = string_of_judgement j ^ " by B-Times {}" in
+      print_string s
+  | BLt j ->
+      let s = string_of_judgement j ^ " by B-Lt {}" in
+      print_string s

@@ -1,3 +1,8 @@
+exception Error of string
+
+(* エラーを発生させる関数 *)
+let err s = raise (Error s)
+
 (* 変数を表す型 *)
 type var = string
 
@@ -79,3 +84,18 @@ and string_of_exp = function
   | LetRecExp (id1, id2, e1, e2) ->
       "let rec " ^ id1 ^ " = fun " ^ id2 ^ " -> " ^ string_of_exp e1 ^ " in "
       ^ string_of_exp e2
+
+let string_of_judgement = function
+  | PlusJ (i1, i2, i3) ->
+      string_of_value i1 ^ " plus " ^ string_of_value i2 ^ " is "
+      ^ string_of_value i3
+  | MinusJ (i1, i2, i3) ->
+      string_of_value i1 ^ " minus " ^ string_of_value i2 ^ " is "
+      ^ string_of_value i3
+  | MultJ (i1, i2, i3) ->
+      string_of_value i1 ^ " times " ^ string_of_value i2 ^ " is "
+      ^ string_of_value i3
+  | LtJ (i1, i2, i3) ->
+      string_of_value i1 ^ " less than " ^ string_of_value i2 ^ " is "
+      ^ string_of_value i3
+  | _ -> err "something wrong!"
