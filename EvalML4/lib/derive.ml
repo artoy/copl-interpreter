@@ -11,13 +11,16 @@ type rule =
   | EMinus of env * exp * exp * value * rule * rule * rule
   | ETimes of env * exp * exp * value * rule * rule * rule
   | ELt of env * exp * exp * value * rule * rule * rule
-  | EVar1 of env * var * value
-  | EVar2 of env * var * value * rule
+  | EVar of env * var * value
   | ELet of env * var * exp * exp * value * rule * rule
   | EFun of env * var * exp
   | EApp of env * exp * exp * value * rule * rule * rule
   | ELetRec of env * var * var * exp * exp * value * rule
   | EAppRec of env * exp * exp * value * rule * rule * rule
+  | ENil of env
+  | ECons of env * exp * exp * value * value * rule * rule
+  | EMatchNil of env * exp * exp * var * var * exp * value * rule * rule
+  | EMatchCons of env * exp * exp * var * var * exp * value * rule * rule
   | BPlus of judgement
   | BMinus of judgement
   | BTimes of judgement
@@ -56,19 +59,12 @@ let rec derive_exp env e v =
       | Lt ->
           let d3 = derive_judgement (LtJ (v1, v2, v)) in
           ELt (env, e1, e2, v, d1, d2, d3))
-  | Var x -> (
-      match env with
-      | Empty -> err "Not bound"
-      | Cons (rest, id, value) ->
-          if x = id && v = value then EVar1 (env, x, v)
-          else if x = id then err "The bound value is wrong"
-          else
-            let d = derive_exp rest e v in
-            EVar2 (env, x, v, d))
+  | Var x ->
+      if v = lookup x env then EVar (env, x, v) else err "Binded value is wrong"
   | LetExp (id, e1, e2) ->
       let v1 = eval_exp env e1 in
       let d1 = derive_exp env e1 v1 in
-      let d2 = derive_exp (Cons (env, id, v1)) e2 v in
+      let d2 = derive_exp (ConsEnv (env, id, v1)) e2 v in
       ELet (env, id, e1, e2, v, d1, d2)
   | FunExp (id, e) -> EFun (env, id, e)
   | AppExp (e1, e2) -> (
@@ -78,17 +74,41 @@ let rec derive_exp env e v =
       let d2 = derive_exp env e2 v2 in
       match v1 with
       | Closure (env', id, body) ->
-          let d3 = derive_exp (Cons (env', id, v2)) body v in
+          let d3 = derive_exp (ConsEnv (env', id, v2)) body v in
           EApp (env, e1, e2, v, d1, d2, d3)
       | RecClosure (env', id, para, body) ->
-          let d3 = derive_exp (Cons (Cons (env', id, v1), para, v2)) body v in
+          let d3 =
+            derive_exp (ConsEnv (ConsEnv (env', id, v1), para, v2)) body v
+          in
           EAppRec (env, e1, e2, v, d1, d2, d3)
       | _ -> err "Non-function value is applied")
   | LetRecExp (id1, id2, e1, e2) ->
       let d =
-        derive_exp (Cons (env, id1, RecClosure (env, id1, id2, e1))) e2 v
+        derive_exp (ConsEnv (env, id1, RecClosure (env, id1, id2, e1))) e2 v
       in
       ELetRec (env, id1, id2, e1, e2, v, d)
+  | NilExp -> ENil env
+  | ConsExp (head, tail) -> (
+      match v with
+      | ConsV (vHead, vTail) ->
+          let d1 = derive_exp env head vHead in
+          let d2 = derive_exp env tail vTail in
+          ECons (env, head, tail, vHead, vTail, d1, d2)
+      | _ -> err "Value must be Cons")
+  | MatchExp (e1, e2, head, tail, e3) -> (
+      let v1 = eval_exp env e1 in
+      match v1 with
+      | NilV ->
+          let d1 = derive_exp env e1 v1 in
+          let d2 = derive_exp env e2 v in
+          EMatchNil (env, e1, e2, head, tail, e3, v, d1, d2)
+      | ConsV (vHead, vTail) ->
+          let d1 = derive_exp env e1 v1 in
+          let d2 =
+            derive_exp (ConsEnv (ConsEnv (env, head, vHead), tail, vTail)) e3 v
+          in
+          EMatchCons (env, e1, e2, head, tail, e3, v, d1, d2)
+      | _ -> err "Value after match must be Nil or Cons")
 
 and derive_judgement j =
   match j with
@@ -213,23 +233,12 @@ let rec pp_derivation n = function
       pp_derivation (n + 1) d3;
       print_newline ();
       print_string s2
-  | EVar1 (env, id, v) ->
+  | EVar (env, id, v) ->
       let s =
         n_space n ^ string_of_env env ^ " |- " ^ id ^ " evalto "
-        ^ string_of_value v ^ " by E-Var1 {}"
+        ^ string_of_value v ^ " by E-Var {}"
       in
       print_string s
-  | EVar2 (env, id, v, d) ->
-      let s1 =
-        n_space n ^ string_of_env env ^ " |- " ^ id ^ " evalto "
-        ^ string_of_value v ^ " by E-Var2 {"
-      in
-      let s2 = n_space n ^ "}" in
-      print_string s1;
-      print_newline ();
-      pp_derivation (n + 1) d;
-      print_newline ();
-      print_string s2
   | ELet (env, id, e1, e2, v, d1, d2) ->
       let s1 =
         n_space n ^ string_of_env env ^ " |- let " ^ id ^ " = "
@@ -296,6 +305,56 @@ let rec pp_derivation n = function
       print_string ";";
       print_newline ();
       pp_derivation (n + 1) d3;
+      print_newline ();
+      print_string s2
+  | ENil env ->
+      let s = n_space n ^ string_of_env env ^ " |- [] evalto [] by E-Nil {}" in
+      print_string s
+  | ECons (env, head, tail, vHead, vTail, d1, d2) ->
+      let s1 =
+        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp head ^ " :: "
+        ^ string_of_exp tail ^ " evalto " ^ string_of_value vHead ^ " :: "
+        ^ string_of_value vTail ^ " by E-Cons {"
+      in
+      let s2 = n_space n ^ "}" in
+      print_string s1;
+      print_newline ();
+      pp_derivation (n + 1) d1;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d2;
+      print_newline ();
+      print_string s2
+  | EMatchNil (env, e1, e2, head, tail, e3, v, d1, d2) ->
+      let s1 =
+        n_space n ^ string_of_env env ^ " |- match " ^ string_of_exp e1
+        ^ " with [] -> " ^ string_of_exp e2 ^ " | " ^ head ^ " :: " ^ tail
+        ^ " -> " ^ string_of_exp e3 ^ " evalto " ^ string_of_value v
+        ^ " by E-MatchNil {"
+      in
+      let s2 = n_space n ^ "}" in
+      print_string s1;
+      print_newline ();
+      pp_derivation (n + 1) d1;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d2;
+      print_newline ();
+      print_string s2
+  | EMatchCons (env, e1, e2, head, tail, e3, v, d1, d2) ->
+      let s1 =
+        n_space n ^ string_of_env env ^ " |- match " ^ string_of_exp e1
+        ^ " with [] -> " ^ string_of_exp e2 ^ " | " ^ head ^ " :: " ^ tail
+        ^ " -> " ^ string_of_exp e3 ^ " evalto " ^ string_of_value v
+        ^ " by E-MatchCons {"
+      in
+      let s2 = n_space n ^ "}" in
+      print_string s1;
+      print_newline ();
+      pp_derivation (n + 1) d1;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d2;
       print_newline ();
       print_string s2
   | BPlus j ->

@@ -15,9 +15,11 @@ type value =
   | BoolV of bool
   | Closure of env * var * exp
   | RecClosure of env * var * var * exp
+  | NilV
+  | ConsV of value * value
 
 (* 環境を表す型 *)
-and env = Empty | Cons of env * var * value
+and env = Empty | ConsEnv of env * var * value
 
 (* 式を表す型 *)
 and exp =
@@ -30,6 +32,9 @@ and exp =
   | FunExp of var * exp
   | AppExp of exp * exp
   | LetRecExp of var * var * exp * exp
+  | NilExp
+  | ConsExp of exp * exp
+  | MatchExp of exp * exp * var * var * exp
 
 (* 判断を表す型 *)
 type judgement =
@@ -45,7 +50,7 @@ exception Not_bound
 (* NOTE: 変数が複数の値に束縛されている場合は、抽象構文木の最も右側・外側の値を返す *)
 let rec lookup x = function
   | Empty -> raise Not_bound
-  | Cons (rest, var, value) -> if var = x then value else lookup x rest
+  | ConsEnv (rest, var, value) -> if var = x then value else lookup x rest
 
 let string_of_prim = function
   | Plus -> "+"
@@ -61,10 +66,12 @@ let rec string_of_value = function
   | RecClosure (env, id, para, e) ->
       "(" ^ string_of_env env ^ ")[rec " ^ id ^ " = fun " ^ para ^ " -> "
       ^ string_of_exp e ^ "]"
+  | NilV -> "[]"
+  | ConsV (v1, v2) -> string_of_value v1 ^ " :: " ^ string_of_value v2
 
 and string_of_env = function
-  | Cons (Empty, var, value) -> var ^ " = " ^ string_of_value value
-  | Cons (rest, var, value) ->
+  | ConsEnv (Empty, var, value) -> var ^ " = " ^ string_of_value value
+  | ConsEnv (rest, var, value) ->
       string_of_env rest ^ ", " ^ var ^ " = " ^ string_of_value value
   | Empty -> ""
 
@@ -84,6 +91,11 @@ and string_of_exp = function
   | LetRecExp (id1, id2, e1, e2) ->
       "let rec " ^ id1 ^ " = fun " ^ id2 ^ " -> " ^ string_of_exp e1 ^ " in "
       ^ string_of_exp e2
+  | NilExp -> "[]"
+  | ConsExp (e1, e2) -> string_of_exp e1 ^ " :: " ^ string_of_exp e2
+  | MatchExp (e1, e2, id1, id2, e3) ->
+      "match " ^ string_of_exp e1 ^ "with [] -> " ^ string_of_exp e2 ^ " | "
+      ^ id1 ^ " :: " ^ id2 ^ " -> " ^ string_of_exp e3
 
 let string_of_judgement = function
   | PlusJ (i1, i2, i3) ->

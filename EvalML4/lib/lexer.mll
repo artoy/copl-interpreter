@@ -10,6 +10,8 @@ let reservedWords = [
   ("fun", Parser.FUN);
   ("rec", Parser.REC);
   ("evalto", Parser.EVALTO);
+  ("match", Parser.MATCH);
+  ("with", Parser.WITH);
 ]
 }
 
@@ -30,15 +32,18 @@ rule main = parse
 | "=" { Parser.EQ }
 | "->" { Parser.RARROW }
 | "|-" { Parser.VDASH }
+| "[]" { Parser.NIL }
 | "," { Parser.COLUMN }
 | "[" { Parser.LBOX }
 | "]" { Parser.RBOX }
+| "::" { Parser.APPEND }
+| "|" { Parser.BAR }
 
 | ['a'-'z'] ['a'-'z' '0'-'9' '_' '\'']*
     { let id = Lexing.lexeme lexbuf in
       try
         List.assoc id reservedWords
       with
-      _ -> Parser.VAR id
+      _ -> Parser.ID id
     }
 | eof { exit 0 }
