@@ -98,6 +98,7 @@ and derive_judgement j =
   | MultJ (_, _, _) -> BTimes j
   | LtJ (_, _, _) -> BLt j
 
+(* n の数だけインデントのための空白を生成する関数 *)
 let rec n_space n = if n = 0 then "" else "  " ^ n_space (n - 1)
 
 (* 導出を出力する関数 *)
