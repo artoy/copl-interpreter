@@ -1,4 +1,5 @@
 open Syntax
+open Match
 
 let apply_prim op arg1 arg2 =
   match (op, arg1, arg2) with
@@ -52,10 +53,16 @@ let rec eval_exp env = function
       ConsV (head, tail)
   | MatchExp (e, c) -> (
       let v = eval_exp env e in
-      let v2 = eval_exp env e2 in
-      match v1 with
-      | NilV -> v2
-      | ConsV (head, rest) ->
-          let newenv = ConsEnv (ConsEnv (env, id1, head), id2, rest) in
-          eval_exp newenv e3
-      | _ -> err "Value after match must be Nil or Cons")
+      match c with
+      | Term (p, e') -> (
+          let j = judge_match p v in
+          match j with
+          | MatchJ (_, _, env1) -> eval_exp (append_env env env1) e'
+          | NotMatchJ (_, _) -> err "It does not match to all patterns"
+          | _ -> err "It must either match or not match")
+      | ConsCl (p, e', c') -> (
+          let j = judge_match p v in
+          match j with
+          | MatchJ (_, _, env1) -> eval_exp (append_env env env1) e'
+          | NotMatchJ (_, _) -> eval_exp env (MatchExp (e, c'))
+          | _ -> err "It must either match or not match"))

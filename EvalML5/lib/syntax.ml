@@ -25,6 +25,7 @@ and env = Empty | ConsEnv of env * var * value
 and pat = VarPat of var | NilPat | ConsPat of pat * pat | Wild
 
 (* パターンマッチ節を表す型 *)
+(* NOTE: Term は terminal の略 *)
 and clauses = Term of pat * exp | ConsCl of pat * exp * clauses
 
 (* 式を表す型 *)

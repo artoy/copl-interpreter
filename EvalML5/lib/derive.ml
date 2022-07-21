@@ -1,5 +1,6 @@
 open Syntax
 open Eval
+open Match
 
 (* 推論規則を表す型 *)
 type rule =
@@ -103,20 +104,33 @@ let rec derive_exp env e v =
           let d2 = derive_exp env tail vTail in
           ECons (env, head, tail, vHead, vTail, d1, d2)
       | _ -> err "Value must be Cons")
-  | MatchExp (e1, e2, head, tail, e3) -> (
-      let v1 = eval_exp env e1 in
-      match v1 with
-      | NilV ->
-          let d1 = derive_exp env e1 v1 in
-          let d2 = derive_exp env e2 v in
-          EMatchNil (env, e1, e2, head, tail, e3, v, d1, d2)
-      | ConsV (vHead, vTail) ->
-          let d1 = derive_exp env e1 v1 in
-          let d2 =
-            derive_exp (ConsEnv (ConsEnv (env, head, vHead), tail, vTail)) e3 v
-          in
-          EMatchCons (env, e1, e2, head, tail, e3, v, d1, d2)
-      | _ -> err "Value after match must be Nil or Cons")
+  | MatchExp (e, c) -> (
+      let v1 = eval_exp env e in
+      match c with
+      | Term (p, e') -> (
+          let j = judge_match p v1 in
+          match j with
+          | MatchJ (_, _, env1) ->
+              let d1 = derive_exp env e v1 in
+              let d2 = derive_judgement j in
+              let d3 = derive_exp (append_env env env1) e' v in
+              EMatchM1 (env, e, p, e', v, d1, d2, d3)
+          | NotMatchJ (_, _) -> err "It does not match to all patterns"
+          | _ -> err "It must either match or not match")
+      | ConsCl (p, e', c') -> (
+          let j = judge_match p v1 in
+          match j with
+          | MatchJ (_, _, env1) ->
+              let d1 = derive_exp env e v1 in
+              let d2 = derive_judgement j in
+              let d3 = derive_exp (append_env env env1) e' v in
+              EMatchM2 (env, e, p, e', c', v, d1, d2, d3)
+          | NotMatchJ (_, _) ->
+              let d1 = derive_exp env e v1 in
+              let d2 = derive_judgement j in
+              let d3 = derive_exp env (MatchExp (e, c')) v in
+              EMatchM1 (env, e, p, e', v, d1, d2, d3)
+          | _ -> err "It must either match or not match"))
 
 and derive_judgement j =
   match j with
