@@ -312,9 +312,9 @@ let rec pp_derivation n = function
       print_string s
   | ECons (env, head, tail, vHead, vTail, d1, d2) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp head ^ " :: "
-        ^ string_of_exp tail ^ " evalto " ^ string_of_value vHead ^ " :: "
-        ^ string_of_value vTail ^ " by E-Cons {"
+        n_space n ^ string_of_env env ^ " |- (" ^ string_of_exp head ^ ") :: ("
+        ^ string_of_exp tail ^ ") evalto (" ^ string_of_value vHead ^ ") :: ("
+        ^ string_of_value vTail ^ ") by E-Cons {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;

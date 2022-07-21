@@ -20,8 +20,8 @@ open Syntax
 
 // NOTE: evalto を使わない判断は扱わないものとする
 toplevel :
-    env=Env VDASH e=Expr EVALTO v=Value SEMISEMI { Eval(env, e, v) }
-  | VDASH e=Expr EVALTO v=Value SEMISEMI { Eval(Empty, e, v) }
+    env=Env VDASH e=Expr EVALTO v=Value SEMISEMI { Eval (env, e, v) }
+  | VDASH e=Expr EVALTO v=Value SEMISEMI { Eval (Empty, e, v) }
 
 Expr :
   e=LTExpr { e }
@@ -74,20 +74,24 @@ AExpr :
   | FALSE  { BExp false }
   | x=ID  { Var x }
   | LPAREN e=Expr RPAREN { e }
+  | NIL { NilExp }
 
 Value :
-    head=AValue APPEND tail=Value { ConsV (head, tail) }
+    v=ConsValue { v }
+
+ConsValue :
+    head=AValue APPEND tail=ConsValue { ConsV (head, tail) }
   | v=AValue { v }
 
 AValue :
     i=INT { IntV i }
   | TRUE   { BoolV true }
   | FALSE  { BoolV false }
-  | LPAREN env=Env RPAREN LBOX FUN x=ID RARROW e=Expr RBOX { Closure(env, x, e) }
-  | LPAREN env=Env RPAREN LBOX REC x1=ID EQ FUN x2=ID RARROW e=Expr RBOX { RecClosure(env, x1, x2, e) }
+  | LPAREN env=Env RPAREN LBOX FUN x=ID RARROW e=Expr RBOX { Closure (env, x, e) }
+  | LPAREN env=Env RPAREN LBOX REC x1=ID EQ FUN x2=ID RARROW e=Expr RBOX { RecClosure (env, x1, x2, e) }
   | NIL { NilV }
   | LPAREN v=Value RPAREN { v }
 
 Env :
-    env=Env COLUMN x=ID EQ v=Value { ConsEnv(env, x, v) }
-  | x=ID EQ v=Value { ConsEnv(Empty, x, v) }
+    env=Env COLUMN x=ID EQ v=Value { ConsEnv (env, x, v) }
+  | x=ID EQ v=Value { ConsEnv (Empty, x, v) }

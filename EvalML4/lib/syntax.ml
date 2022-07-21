@@ -67,7 +67,8 @@ let rec string_of_value = function
       "(" ^ string_of_env env ^ ")[rec " ^ id ^ " = fun " ^ para ^ " -> "
       ^ string_of_exp e ^ "]"
   | NilV -> "[]"
-  | ConsV (v1, v2) -> string_of_value v1 ^ " :: " ^ string_of_value v2
+  | ConsV (v1, v2) ->
+      "(" ^ string_of_value v1 ^ ") :: (" ^ string_of_value v2 ^ ")"
 
 and string_of_env = function
   | ConsEnv (Empty, var, value) -> var ^ " = " ^ string_of_value value
@@ -92,9 +93,10 @@ and string_of_exp = function
       "let rec " ^ id1 ^ " = fun " ^ id2 ^ " -> " ^ string_of_exp e1 ^ " in "
       ^ string_of_exp e2
   | NilExp -> "[]"
-  | ConsExp (e1, e2) -> string_of_exp e1 ^ " :: " ^ string_of_exp e2
+  | ConsExp (e1, e2) ->
+      "(" ^ string_of_exp e1 ^ ") :: (" ^ string_of_exp e2 ^ ")"
   | MatchExp (e1, e2, id1, id2, e3) ->
-      "match " ^ string_of_exp e1 ^ "with [] -> " ^ string_of_exp e2 ^ " | "
+      "match " ^ string_of_exp e1 ^ " with [] -> " ^ string_of_exp e2 ^ " | "
       ^ id1 ^ " :: " ^ id2 ^ " -> " ^ string_of_exp e3
 
 let string_of_judgement = function
