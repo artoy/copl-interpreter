@@ -134,6 +134,36 @@ let rec derive_exp env e v =
 
 and derive_judgement j =
   match j with
+  | MatchJ (p, v, env) -> (
+      match (p, v) with
+      | VarPat x, _ -> MVar (x, v, ConsEnv (Empty, x, v))
+      | NilPat, NilV -> MNil
+      | ConsPat (p1, p2), ConsV (v1, v2) -> (
+          let j1 = judge_match p1 v1 in
+          let j2 = judge_match p2 v2 in
+          match (j1, j2) with
+          | MatchJ (_, _, env1), MatchJ (_, _, env2) ->
+              let d1 = derive_judgement (MatchJ (p1, v1, env1)) in
+              let d2 = derive_judgement (MatchJ (p2, v2, env2)) in
+              MCons (p1, p2, v1, v2, env, d1, d2)
+          | _ -> err "Must match!")
+      | Wild, _ -> MWild v
+      | _ -> err "Something wrong!")
+  | NotMatchJ (p, v) -> (
+      match (p, v) with
+      | ConsPat (p1, p2), ConsV (v1, v2) -> (
+          let j1 = judge_match p1 v1 in
+          match j1 with
+          | NotMatchJ (_, _) ->
+              let d = derive_judgement (NotMatchJ (p1, v1)) in
+              NMConsConsL (p1, p2, v1, v2, d)
+          | MatchJ (_, _, _) ->
+              let d = derive_judgement (NotMatchJ (p2, v2)) in
+              NMConsConsR (p1, p2, v1, v2, d)
+          | _ -> err "It must either match or not match")
+      | NilPat, ConsV (v1, v2) -> NMConsNil (v1, v2)
+      | ConsPat (p1, p2), NilV -> NMNilCons (p1, p2)
+      | _ -> err "Something wrong!")
   | EvalJ (env, exp, value) -> derive_exp env exp value
   | PlusJ (_, _, _) -> BPlus j
   | MinusJ (_, _, _) -> BMinus j
