@@ -67,9 +67,8 @@ let append_env env1 env2 =
     | Empty, Empty -> env1
     | Empty, ConsEnv (rest, id, v) ->
         append_env_with_tmp (ConsEnv (env1, id, v)) env2 rest
-    | ConsEnv (rest, id, v), ConsEnv (_, _, _) ->
+    | ConsEnv (rest, id, v), _ ->
         append_env_with_tmp env1 rest (ConsEnv (tmp, id, v))
-    | _ -> err "something wrong!"
   in
   append_env_with_tmp env1 env2 Empty
 

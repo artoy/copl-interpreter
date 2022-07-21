@@ -202,26 +202,26 @@ let rec pp_derivation n = function
       print_string s2
   | MWild v ->
       let s =
-        n_space n ^ "_ matches " ^ string_of_value v ^ " when () by M-Var {}"
+        n_space n ^ "_ matches " ^ string_of_value v ^ " when () by M-Wild {}"
       in
       print_string s
   | NMConsNil (v1, v2) ->
       let s =
         n_space n ^ "[] doesn't match (" ^ string_of_value v1 ^ ") :: ("
-        ^ string_of_value v2 ^ ") by M-ConsNil {}"
+        ^ string_of_value v2 ^ ") by NM-ConsNil {}"
       in
       print_string s
   | NMNilCons (p1, p2) ->
       let s =
         n_space n ^ "(" ^ string_of_pat p1 ^ ") :: (" ^ string_of_pat p2
-        ^ ") doesn't match [] by M-NilCons {}"
+        ^ ") doesn't match [] by NM-NilCons {}"
       in
       print_string s
   | NMConsConsL (p1, p2, v1, v2, d) ->
       let s1 =
         n_space n ^ "(" ^ string_of_pat p1 ^ ") :: (" ^ string_of_pat p2
         ^ ") doesn't match (" ^ string_of_value v1 ^ ") :: ("
-        ^ string_of_value v2 ^ ") by M-ConsConsL {}"
+        ^ string_of_value v2 ^ ") by NM-ConsConsL {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;
@@ -233,7 +233,7 @@ let rec pp_derivation n = function
       let s1 =
         n_space n ^ "(" ^ string_of_pat p1 ^ ") :: (" ^ string_of_pat p2
         ^ ") doesn't match (" ^ string_of_value v1 ^ ") :: ("
-        ^ string_of_value v2 ^ ") by M-ConsConsR {}"
+        ^ string_of_value v2 ^ ") by NM-ConsConsR {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;

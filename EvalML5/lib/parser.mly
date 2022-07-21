@@ -10,6 +10,7 @@ open Syntax
 %token REC
 %token EVALTO VDASH COLUMN LBOX RBOX
 %token MATCH WITH NIL APPEND BAR
+%token WILD
 
 %token <int> INT
 %token <Syntax.var> ID
@@ -58,7 +59,24 @@ FunExpr :
     FUN x=ID RARROW e=Expr { FunExp (x, e) }
 
 MatchExpr :
-    MATCH e1=Expr WITH NIL RARROW e2=Expr BAR x1=ID APPEND x2=ID RARROW e3=Expr { MatchExp (e1, e2, x1, x2, e3) }
+    MATCH e=Expr WITH c=Clauses { MatchExp (e, c) }
+
+Clauses :
+    p=Pattern RARROW e=Expr BAR c=Clauses { ConsCl (p, e, c) }
+  | p=Pattern RARROW e=Expr { Term (p, e) }
+
+Pattern :
+    p=ConsPattern { p }
+
+ConsPattern :
+    head=APattern APPEND tail=ConsPattern { ConsPat (head, tail) }
+  | p=APattern { p }
+
+APattern :
+    x=ID { VarPat x }
+  | NIL { NilPat }
+  | WILD { Wild }
+  | LPAREN p=Pattern RPAREN { p }
 
 ConsExpr :
     i=AppExpr APPEND e=ConsExpr { ConsExp (i, e) }

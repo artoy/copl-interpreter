@@ -38,6 +38,7 @@ rule main = parse
 | "]" { Parser.RBOX }
 | "::" { Parser.APPEND }
 | "|" { Parser.BAR }
+| "_" { Parser.WILD }
 
 | ['a'-'z'] ['a'-'z' '0'-'9' '_' '\'']*
     { let id = Lexing.lexeme lexbuf in
