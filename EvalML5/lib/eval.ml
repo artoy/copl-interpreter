@@ -50,14 +50,12 @@ let rec eval_exp env = function
       let head = eval_exp env e1 in
       let tail = eval_exp env e2 in
       ConsV (head, tail)
-  | MatchExp (e1, e2, id1, id2, e3) -> (
-      if id1 = id2 then err "Head of list must be different from rest"
-      else
-        let v1 = eval_exp env e1 in
-        let v2 = eval_exp env e2 in
-        match v1 with
-        | NilV -> v2
-        | ConsV (head, rest) ->
-            let newenv = ConsEnv (ConsEnv (env, id1, head), id2, rest) in
-            eval_exp newenv e3
-        | _ -> err "Value after match must be Nil or Cons")
+  | MatchExp (e, c) -> (
+      let v = eval_exp env e in
+      let v2 = eval_exp env e2 in
+      match v1 with
+      | NilV -> v2
+      | ConsV (head, rest) ->
+          let newenv = ConsEnv (ConsEnv (env, id1, head), id2, rest) in
+          eval_exp newenv e3
+      | _ -> err "Value after match must be Nil or Cons")

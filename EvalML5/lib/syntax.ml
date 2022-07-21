@@ -21,6 +21,12 @@ type value =
 (* 環境を表す型 *)
 and env = Empty | ConsEnv of env * var * value
 
+(* パターンを表す型 *)
+and pat = VarPat of var | NilPat | ConsPat of pat * pat | Wild
+
+(* パターンマッチ節を表す型 *)
+and clauses = Term of pat * exp | ConsCl of pat * exp * clauses
+
 (* 式を表す型 *)
 and exp =
   | IExp of int
@@ -34,11 +40,13 @@ and exp =
   | LetRecExp of var * var * exp * exp
   | NilExp
   | ConsExp of exp * exp
-  | MatchExp of exp * exp * var * var * exp
+  | MatchExp of exp * clauses
 
 (* 判断を表す型 *)
 type judgement =
-  | Eval of env * exp * value
+  | MatchJ of pat * value * env
+  | NotMatchJ of pat * value
+  | EvalJ of env * exp * value
   | PlusJ of value * value * value
   | MinusJ of value * value * value
   | MultJ of value * value * value
@@ -51,6 +59,18 @@ exception Not_bound
 let rec lookup x = function
   | Empty -> raise Not_bound
   | ConsEnv (rest, var, value) -> if var = x then value else lookup x rest
+
+let append_env env1 env2 =
+  let rec append_env_with_tmp env1 env2 tmp =
+    match (env2, tmp) with
+    | Empty, Empty -> env1
+    | Empty, ConsEnv (rest, id, v) ->
+        append_env_with_tmp (ConsEnv (env1, id, v)) env2 rest
+    | ConsEnv (rest, id, v), ConsEnv (_, _, _) ->
+        append_env_with_tmp env1 rest (ConsEnv (tmp, id, v))
+    | _ -> err "something wrong!"
+  in
+  append_env_with_tmp env1 env2 Empty
 
 let string_of_prim = function
   | Plus -> "+"
@@ -76,6 +96,18 @@ and string_of_env = function
       string_of_env rest ^ ", " ^ var ^ " = " ^ string_of_value value
   | Empty -> ""
 
+and string_of_pat = function
+  | VarPat id -> id
+  | NilPat -> "[]"
+  | ConsPat (p1, p2) ->
+      "(" ^ string_of_pat p1 ^ ") :: (" ^ string_of_pat p2 ^ ")"
+  | Wild -> "_"
+
+and string_of_clauses = function
+  | Term (p, e) -> string_of_pat p ^ " -> " ^ string_of_exp e
+  | ConsCl (p, e, c) ->
+      string_of_pat p ^ " -> " ^ string_of_exp e ^ " | " ^ string_of_clauses c
+
 and string_of_exp = function
   | IExp i -> string_of_int i
   | BExp b -> string_of_bool b
@@ -95,9 +127,8 @@ and string_of_exp = function
   | NilExp -> "[]"
   | ConsExp (e1, e2) ->
       "(" ^ string_of_exp e1 ^ ") :: (" ^ string_of_exp e2 ^ ")"
-  | MatchExp (e1, e2, id1, id2, e3) ->
-      "match " ^ string_of_exp e1 ^ " with [] -> " ^ string_of_exp e2 ^ " | "
-      ^ id1 ^ " :: " ^ id2 ^ " -> " ^ string_of_exp e3
+  | MatchExp (e, c) ->
+      "match " ^ string_of_exp e ^ " with " ^ string_of_clauses c
 
 let string_of_judgement = function
   | PlusJ (i1, i2, i3) ->

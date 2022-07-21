@@ -3,6 +3,14 @@ open Eval
 
 (* 推論規則を表す型 *)
 type rule =
+  | MVar of var * value * env
+  | MNil
+  | MCons of pat * pat * value * value * env * rule * rule
+  | MWild of value
+  | NMConsNil of value * value
+  | NMNilCons of pat * pat
+  | NMConsConsL of pat * pat * value * value * rule
+  | NMConsConsR of pat * pat * value * value * rule
   | EInt of env * int * value
   | EBool of env * bool * value
   | EIfT of env * exp * exp * exp * value * rule * rule
@@ -19,8 +27,8 @@ type rule =
   | EAppRec of env * exp * exp * value * rule * rule * rule
   | ENil of env
   | ECons of env * exp * exp * value * value * rule * rule
-  | EMatchNil of env * exp * exp * var * var * exp * value * rule * rule
-  | EMatchCons of env * exp * exp * var * var * exp * value * rule * rule
+  | EMatchM1 of env * exp * pat * exp * value * rule * rule * rule
+  | EMatchM2 of env * exp * pat * exp * clauses * value * rule * rule * rule
   | BPlus of judgement
   | BMinus of judgement
   | BTimes of judgement
@@ -112,7 +120,7 @@ let rec derive_exp env e v =
 
 and derive_judgement j =
   match j with
-  | Eval (env, exp, value) -> derive_exp env exp value
+  | EvalJ (env, exp, value) -> derive_exp env exp value
   | PlusJ (_, _, _) -> BPlus j
   | MinusJ (_, _, _) -> BMinus j
   | MultJ (_, _, _) -> BTimes j
