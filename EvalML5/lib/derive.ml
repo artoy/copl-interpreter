@@ -30,6 +30,7 @@ type rule =
   | ECons of env * exp * exp * value * value * rule * rule
   | EMatchM1 of env * exp * pat * exp * value * rule * rule * rule
   | EMatchM2 of env * exp * pat * exp * clauses * value * rule * rule * rule
+  | EMatchN of env * exp * pat * exp * clauses * value * rule * rule * rule
   | BPlus of judgement
   | BMinus of judgement
   | BTimes of judgement
@@ -129,7 +130,7 @@ let rec derive_exp env e v =
               let d1 = derive_exp env e v1 in
               let d2 = derive_judgement j in
               let d3 = derive_exp env (MatchExp (e, c')) v in
-              EMatchM1 (env, e, p, e', v, d1, d2, d3)
+              EMatchN (env, e, p, e', c', v, d1, d2, d3)
           | _ -> err "It must either match or not match"))
 
 and derive_judgement j =
@@ -175,6 +176,71 @@ let rec n_space n = if n = 0 then "" else "  " ^ n_space (n - 1)
 
 (* 導出を出力する関数 *)
 let rec pp_derivation n = function
+  | MVar (x, v, env) ->
+      let s =
+        n_space n ^ x ^ " matches " ^ string_of_value v ^ " when ("
+        ^ string_of_env env ^ ") by M-Var {}"
+      in
+      print_string s
+  | MNil ->
+      let s = n_space n ^ "[] matches [] when () by M-Nil {}" in
+      print_string s
+  | MCons (p1, p2, v1, v2, env, d1, d2) ->
+      let s1 =
+        n_space n ^ "(" ^ string_of_pat p1 ^ ") :: (" ^ string_of_pat p2
+        ^ ") matches (" ^ string_of_value v1 ^ ") :: (" ^ string_of_value v2
+        ^ ") when (" ^ string_of_env env ^ ") by M-Cons {"
+      in
+      let s2 = n_space n ^ "}" in
+      print_string s1;
+      print_newline ();
+      pp_derivation (n + 1) d1;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d2;
+      print_newline ();
+      print_string s2
+  | MWild v ->
+      let s =
+        n_space n ^ "_ matches " ^ string_of_value v ^ " when () by M-Var {}"
+      in
+      print_string s
+  | NMConsNil (v1, v2) ->
+      let s =
+        n_space n ^ "[] doesn't match (" ^ string_of_value v1 ^ ") :: ("
+        ^ string_of_value v2 ^ ") by M-ConsNil {}"
+      in
+      print_string s
+  | NMNilCons (p1, p2) ->
+      let s =
+        n_space n ^ "(" ^ string_of_pat p1 ^ ") :: (" ^ string_of_pat p2
+        ^ ") doesn't match [] by M-NilCons {}"
+      in
+      print_string s
+  | NMConsConsL (p1, p2, v1, v2, d) ->
+      let s1 =
+        n_space n ^ "(" ^ string_of_pat p1 ^ ") :: (" ^ string_of_pat p2
+        ^ ") doesn't match (" ^ string_of_value v1 ^ ") :: ("
+        ^ string_of_value v2 ^ ") by M-ConsConsL {}"
+      in
+      let s2 = n_space n ^ "}" in
+      print_string s1;
+      print_newline ();
+      pp_derivation (n + 1) d;
+      print_newline ();
+      print_string s2
+  | NMConsConsR (p1, p2, v1, v2, d) ->
+      let s1 =
+        n_space n ^ "(" ^ string_of_pat p1 ^ ") :: (" ^ string_of_pat p2
+        ^ ") doesn't match (" ^ string_of_value v1 ^ ") :: ("
+        ^ string_of_value v2 ^ ") by M-ConsConsR {}"
+      in
+      let s2 = n_space n ^ "}" in
+      print_string s1;
+      print_newline ();
+      pp_derivation (n + 1) d;
+      print_newline ();
+      print_string s2
   | EInt (env, i, v) ->
       let s =
         n_space n ^ string_of_env env ^ " |- " ^ string_of_int i ^ " evalto "
@@ -377,12 +443,11 @@ let rec pp_derivation n = function
       pp_derivation (n + 1) d2;
       print_newline ();
       print_string s2
-  | EMatchNil (env, e1, e2, head, tail, e3, v, d1, d2) ->
+  | EMatchM1 (env, e0, p, e, v, d1, d2, d3) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- match " ^ string_of_exp e1
-        ^ " with [] -> " ^ string_of_exp e2 ^ " | " ^ head ^ " :: " ^ tail
-        ^ " -> " ^ string_of_exp e3 ^ " evalto " ^ string_of_value v
-        ^ " by E-MatchNil {"
+        n_space n ^ string_of_env env ^ " |- match " ^ string_of_exp e0
+        ^ " with " ^ string_of_pat p ^ " -> " ^ string_of_exp e ^ " evalto "
+        ^ string_of_value v ^ " by E-MatchM1 {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;
@@ -391,14 +456,17 @@ let rec pp_derivation n = function
       print_string ";";
       print_newline ();
       pp_derivation (n + 1) d2;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d3;
       print_newline ();
       print_string s2
-  | EMatchCons (env, e1, e2, head, tail, e3, v, d1, d2) ->
+  | EMatchM2 (env, e0, p, e, c, v, d1, d2, d3) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- match " ^ string_of_exp e1
-        ^ " with [] -> " ^ string_of_exp e2 ^ " | " ^ head ^ " :: " ^ tail
-        ^ " -> " ^ string_of_exp e3 ^ " evalto " ^ string_of_value v
-        ^ " by E-MatchCons {"
+        n_space n ^ string_of_env env ^ " |- match " ^ string_of_exp e0
+        ^ " with " ^ string_of_pat p ^ " -> " ^ string_of_exp e ^ " | "
+        ^ string_of_clauses c ^ " evalto " ^ string_of_value v
+        ^ " by E-MatchM2 {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;
@@ -407,6 +475,28 @@ let rec pp_derivation n = function
       print_string ";";
       print_newline ();
       pp_derivation (n + 1) d2;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d3;
+      print_newline ();
+      print_string s2
+  | EMatchN (env, e0, p, e, c, v, d1, d2, d3) ->
+      let s1 =
+        n_space n ^ string_of_env env ^ " |- match " ^ string_of_exp e0
+        ^ " with " ^ string_of_pat p ^ " -> " ^ string_of_exp e ^ " | "
+        ^ string_of_clauses c ^ " evalto " ^ string_of_value v
+        ^ " by E-MatchN {"
+      in
+      let s2 = n_space n ^ "}" in
+      print_string s1;
+      print_newline ();
+      pp_derivation (n + 1) d1;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d2;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d3;
       print_newline ();
       print_string s2
   | BPlus j ->
