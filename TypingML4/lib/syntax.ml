@@ -9,17 +9,11 @@ type var = string
 (* 二項演算子を表す型 *)
 type prim = Plus | Minus | Mult | Lt
 
-(* 値を表す型 *)
-type value =
-  | IntV of int
-  | BoolV of bool
-  | Closure of env * var * exp
-  | RecClosure of env * var * var * exp
-  | NilV
-  | ConsV of value * value
+(* 型を表す型 *)
+type ty = BoolT | IntT | FunT of ty * ty | ListT of ty
 
-(* 環境を表す型 *)
-and env = Empty | ConsEnv of env * var * value
+(* 型環境を表す型 *)
+and tyenv = Empty | ConsEnv of tyenv * var * ty
 
 (* 式を表す型 *)
 and exp =
@@ -37,12 +31,7 @@ and exp =
   | MatchExp of exp * exp * var * var * exp
 
 (* 判断を表す型 *)
-type judgement =
-  | Eval of env * exp * value
-  | PlusJ of value * value * value
-  | MinusJ of value * value * value
-  | MultJ of value * value * value
-  | LtJ of value * value * value
+type judgement = Typing of tyenv * exp * ty
 
 exception Not_bound
 
@@ -50,7 +39,7 @@ exception Not_bound
 (* NOTE: 変数が複数の値に束縛されている場合は、抽象構文木の最も右側・外側の値を返す *)
 let rec lookup x = function
   | Empty -> raise Not_bound
-  | ConsEnv (rest, var, value) -> if var = x then value else lookup x rest
+  | ConsEnv (rest, var, ty) -> if var = x then ty else lookup x rest
 
 let string_of_prim = function
   | Plus -> "+"
@@ -58,22 +47,16 @@ let string_of_prim = function
   | Mult -> "*"
   | Lt -> "<"
 
-let rec string_of_value = function
-  | IntV i -> string_of_int i
-  | BoolV b -> string_of_bool b
-  | Closure (env, id, e) ->
-      "(" ^ string_of_env env ^ ")[fun " ^ id ^ " -> " ^ string_of_exp e ^ "]"
-  | RecClosure (env, id, para, e) ->
-      "(" ^ string_of_env env ^ ")[rec " ^ id ^ " = fun " ^ para ^ " -> "
-      ^ string_of_exp e ^ "]"
-  | NilV -> "[]"
-  | ConsV (v1, v2) ->
-      "(" ^ string_of_value v1 ^ ") :: (" ^ string_of_value v2 ^ ")"
+let rec string_of_ty = function
+  | IntT -> "int"
+  | BoolT -> "bool"
+  | FunT (t1, t2) -> string_of_ty t1 ^ " -> " ^ string_of_ty t2
+  | ListT t -> string_of_ty t ^ " list"
 
-and string_of_env = function
-  | ConsEnv (Empty, var, value) -> var ^ " = " ^ string_of_value value
-  | ConsEnv (rest, var, value) ->
-      string_of_env rest ^ ", " ^ var ^ " = " ^ string_of_value value
+and string_of_tyenv = function
+  | ConsEnv (Empty, var, t) -> var ^ " = " ^ string_of_ty t
+  | ConsEnv (rest, var, t) ->
+      string_of_tyenv rest ^ ", " ^ var ^ " = " ^ string_of_ty t
   | Empty -> ""
 
 and string_of_exp = function
@@ -100,16 +83,5 @@ and string_of_exp = function
       ^ id1 ^ " :: " ^ id2 ^ " -> " ^ string_of_exp e3
 
 let string_of_judgement = function
-  | PlusJ (i1, i2, i3) ->
-      string_of_value i1 ^ " plus " ^ string_of_value i2 ^ " is "
-      ^ string_of_value i3
-  | MinusJ (i1, i2, i3) ->
-      string_of_value i1 ^ " minus " ^ string_of_value i2 ^ " is "
-      ^ string_of_value i3
-  | MultJ (i1, i2, i3) ->
-      string_of_value i1 ^ " times " ^ string_of_value i2 ^ " is "
-      ^ string_of_value i3
-  | LtJ (i1, i2, i3) ->
-      string_of_value i1 ^ " less than " ^ string_of_value i2 ^ " is "
-      ^ string_of_value i3
-  | _ -> err "something wrong!"
+  | Typing (env, e, t) ->
+      string_of_tyenv env ^ " |- " ^ string_of_exp e ^ " : " ^ string_of_ty t

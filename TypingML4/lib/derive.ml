@@ -1,30 +1,23 @@
 open Syntax
-open Eval
+(* open Eval *)
 
 (* 推論規則を表す型 *)
 type rule =
-  | EInt of env * int * value
-  | EBool of env * bool * value
-  | EIfT of env * exp * exp * exp * value * rule * rule
-  | EIfF of env * exp * exp * exp * value * rule * rule
-  | EPlus of env * exp * exp * value * rule * rule * rule
-  | EMinus of env * exp * exp * value * rule * rule * rule
-  | ETimes of env * exp * exp * value * rule * rule * rule
-  | ELt of env * exp * exp * value * rule * rule * rule
-  | EVar of env * var * value
-  | ELet of env * var * exp * exp * value * rule * rule
-  | EFun of env * var * exp
-  | EApp of env * exp * exp * value * rule * rule * rule
-  | ELetRec of env * var * var * exp * exp * value * rule
-  | EAppRec of env * exp * exp * value * rule * rule * rule
-  | ENil of env
-  | ECons of env * exp * exp * value * value * rule * rule
-  | EMatchNil of env * exp * exp * var * var * exp * value * rule * rule
-  | EMatchCons of env * exp * exp * var * var * exp * value * rule * rule
-  | BPlus of judgement
-  | BMinus of judgement
-  | BTimes of judgement
-  | BLt of judgement
+  | TInt of tyenv * int
+  | TBool of tyenv * bool
+  | TIf of tyenv * exp * exp * exp * ty * rule * rule
+  | TPlus of tyenv * exp * exp * rule * rule
+  | TMinus of tyenv * exp * exp * rule * rule
+  | TTimes of tyenv * exp * exp * rule * rule
+  | TLt of tyenv * exp * exp * rule * rule
+  | TVar of tyenv * var * ty
+  | TLet of tyenv * var * exp * exp * ty * rule * rule
+  | TFun of tyenv * var * exp * ty * ty * rule
+  | TApp of tyenv * exp * exp * ty * rule * rule
+  | TLetRec of tyenv * var * var * exp * exp * ty * rule * rule
+  | TNil of tyenv * ty
+  | TCons of tyenv * exp * exp * ty * rule * rule
+  | TMatch of tyenv * exp * exp * var * var * exp * ty * rule * rule * rule
 
 let rec derive_exp env e v =
   match e with
