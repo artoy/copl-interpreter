@@ -207,12 +207,17 @@ let rec pp_derivation n = function
       print_newline ();
       print_string s2
   | TFun (tyenv, id, e, ty1, ty2, d1) ->
-      let s =
+      let s1 =
         n_space n ^ string_of_tyenv tyenv ^ " |- fun " ^ id ^ " -> "
         ^ string_of_exp e ^ " : (" ^ string_of_ty ty1 ^ " -> "
         ^ string_of_ty ty2 ^ ") by T-Fun {}"
       in
-      print_string s
+      let s2 = n_space n ^ "}" in
+      print_string s1;
+      print_newline ();
+      pp_derivation (n + 1) d1;
+      print_newline ();
+      print_string s2
   | TApp (tyenv, e1, e2, ty, d1, d2) ->
       let s1 =
         n_space n ^ string_of_tyenv tyenv ^ " |- " ^ string_of_exp e1 ^ " ("
@@ -278,4 +283,7 @@ let rec pp_derivation n = function
       print_newline ();
       pp_derivation (n + 1) d2;
       print_newline ();
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d3;
       print_string s2
