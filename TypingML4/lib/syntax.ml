@@ -9,8 +9,11 @@ type var = string
 (* 二項演算子を表す型 *)
 type prim = Plus | Minus | Mult | Lt
 
+(* 型変数を表す型 *)
+type tyvar = int
+
 (* 型を表す型 *)
-type ty = BoolT | IntT | FunT of ty * ty | ListT of ty
+type ty = BoolT | IntT | FunT of ty * ty | ListT of ty | VarT of tyvar
 
 (* 型環境を表す型 *)
 and tyenv = Empty | ConsEnv of tyenv * var * ty
@@ -41,6 +44,16 @@ let rec lookup x = function
   | Empty -> raise Not_bound
   | ConsEnv (rest, var, ty) -> if var = x then ty else lookup x rest
 
+(* 新しい型変数を作る関数 *)
+let fresh_tyvar =
+  let counter = ref 0 in
+  let body () =
+    let v = !counter in
+    counter := v + 1;
+    v
+  in
+  body
+
 let string_of_prim = function
   | Plus -> "+"
   | Minus -> "-"
@@ -52,6 +65,7 @@ let rec string_of_ty = function
   | BoolT -> "bool"
   | FunT (t1, t2) -> string_of_ty t1 ^ " -> " ^ string_of_ty t2
   | ListT t -> string_of_ty t ^ " list"
+  | _ -> err "VarT does not appear in the output."
 
 and string_of_tyenv = function
   | ConsEnv (Empty, var, t) -> var ^ " = " ^ string_of_ty t

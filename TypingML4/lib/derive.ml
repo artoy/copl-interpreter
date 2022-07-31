@@ -19,10 +19,10 @@ type rule =
   | TCons of tyenv * exp * exp * ty * rule * rule
   | TMatch of tyenv * exp * exp * var * var * exp * ty * rule * rule * rule
 
-let rec derive_exp env e v =
+let rec derive_exp env e ty =
   match e with
-  | IExp i -> EInt (env, i, v)
-  | BExp b -> EBool (env, b, v)
+  | IExp i -> TInt (env, i)
+  | BExp b -> TBool (env, b)
   | IfExp (e1, e2, e3) -> (
       let test = eval_exp env e1 in
       let d1 = derive_exp env e1 test in
