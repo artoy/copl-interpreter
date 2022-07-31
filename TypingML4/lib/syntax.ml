@@ -1,3 +1,5 @@
+module SI = Set.Make (Int)
+
 exception Error of string
 
 (* エラーを発生させる関数 *)
@@ -53,6 +55,15 @@ let fresh_tyvar =
     v
   in
   body
+
+(* 型から型変数を取り出す関数 *)
+let rec get_tyvar ty =
+  match ty with
+  | IntT -> SI.empty
+  | BoolT -> SI.empty
+  | FunT (t1, t2) -> SI.union (get_tyvar t1) (get_tyvar t2)
+  | ListT t -> get_tyvar t
+  | VarT t -> SI.singleton t
 
 let string_of_prim = function
   | Plus -> "+"
