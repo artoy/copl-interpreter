@@ -1,11 +1,11 @@
 open Syntax
-(* open Eval *)
+open Typing
 
 (* 推論規則を表す型 *)
 type rule =
   | TInt of tyenv * int
   | TBool of tyenv * bool
-  | TIf of tyenv * exp * exp * exp * ty * rule * rule
+  | TIf of tyenv * exp * exp * exp * ty * rule * rule * rule
   | TPlus of tyenv * exp * exp * rule * rule
   | TMinus of tyenv * exp * exp * rule * rule
   | TTimes of tyenv * exp * exp * rule * rule
@@ -19,149 +19,103 @@ type rule =
   | TCons of tyenv * exp * exp * ty * rule * rule
   | TMatch of tyenv * exp * exp * var * var * exp * ty * rule * rule * rule
 
-let rec derive_exp env e ty =
+let rec derive_exp tyenv e ty =
   match e with
-  | IExp i -> TInt (env, i)
-  | BExp b -> TBool (env, b)
-  | IfExp (e1, e2, e3) -> (
-      let test = eval_exp env e1 in
-      let d1 = derive_exp env e1 test in
-      match test with
-      | BoolV true ->
-          let d2 = derive_exp env e2 v in
-          EIfT (env, e1, e2, e3, v, d1, d2)
-      | BoolV false ->
-          let d3 = derive_exp env e3 v in
-          EIfF (env, e1, e2, e3, v, d1, d3)
-      | _ -> err "Test expression must be boolean: if")
+  | IExp i -> TInt (tyenv, i)
+  | BExp b -> TBool (tyenv, b)
+  | IfExp (e1, e2, e3) ->
+      let d1 = derive_exp tyenv e1 BoolT in
+      let d2 = derive_exp tyenv e2 ty in
+      let d3 = derive_exp tyenv e3 ty in
+      TIf (tyenv, e1, e2, e3, ty, d1, d2, d3)
   | BinOp (op, e1, e2) -> (
-      let v1 = eval_exp env e1 in
-      let v2 = eval_exp env e2 in
-      let d1 = derive_exp env e1 v1 in
-      let d2 = derive_exp env e2 v2 in
+      let d1 = derive_exp tyenv e1 IntT in
+      let d2 = derive_exp tyenv e2 IntT in
       match op with
-      | Plus ->
-          let d3 = derive_judgement (PlusJ (v1, v2, v)) in
-          EPlus (env, e1, e2, v, d1, d2, d3)
-      | Minus ->
-          let d3 = derive_judgement (MinusJ (v1, v2, v)) in
-          EMinus (env, e1, e2, v, d1, d2, d3)
-      | Mult ->
-          let d3 = derive_judgement (MultJ (v1, v2, v)) in
-          ETimes (env, e1, e2, v, d1, d2, d3)
-      | Lt ->
-          let d3 = derive_judgement (LtJ (v1, v2, v)) in
-          ELt (env, e1, e2, v, d1, d2, d3))
+      | Plus -> TPlus (tyenv, e1, e2, d1, d2)
+      | Minus -> TMinus (tyenv, e1, e2, d1, d2)
+      | Mult -> TTimes (tyenv, e1, e2, d1, d2)
+      | Lt -> TLt (tyenv, e1, e2, d1, d2))
   | Var x ->
-      if v = lookup x env then EVar (env, x, v) else err "Binded value is wrong"
+      if ty = lookup x tyenv then TVar (tyenv, x, ty)
+      else err "Binded value is wrong"
   | LetExp (id, e1, e2) ->
-      let v1 = eval_exp env e1 in
-      let d1 = derive_exp env e1 v1 in
-      let d2 = derive_exp (ConsEnv (env, id, v1)) e2 v in
-      ELet (env, id, e1, e2, v, d1, d2)
-  | FunExp (id, e) -> EFun (env, id, e)
-  | AppExp (e1, e2) -> (
-      let v1 = eval_exp env e1 in
-      let v2 = eval_exp env e2 in
-      let d1 = derive_exp env e1 v1 in
-      let d2 = derive_exp env e2 v2 in
-      match v1 with
-      | Closure (env', id, body) ->
-          let d3 = derive_exp (ConsEnv (env', id, v2)) body v in
-          EApp (env, e1, e2, v, d1, d2, d3)
-      | RecClosure (env', id, para, body) ->
+      let _, t1, _ = pt tyenv e1 in
+      let d1 = derive_exp tyenv e1 t1 in
+      let d2 = derive_exp (ConsEnv (tyenv, id, t1)) e2 ty in
+      TLet (tyenv, id, e1, e2, ty, d1, d2)
+  | FunExp (id, e) -> (
+      match ty with
+      | FunT (t1, t2) ->
+          let d1 = derive_exp (ConsEnv (tyenv, id, t1)) e t2 in
+          TFun (tyenv, id, e, t1, t2, d1)
+      | _ -> err "The type should be a function type.")
+  | AppExp (e1, e2) ->
+      let _, t1, _ = pt tyenv e1 in
+      let _, t2, _ = pt tyenv e2 in
+      let d1 = derive_exp tyenv e1 t1 in
+      let d2 = derive_exp tyenv e2 t2 in
+      TApp (tyenv, e1, e2, ty, d1, d2)
+  | LetRecExp (id1, id2, e1, e2) -> (
+      let s, _, vars = pt tyenv e in
+      match vars with
+      | [ VarT v1; VarT v2 ] -> (
+          let t12 = get_ty_from_tyvar s v1 in
+          let t1 = get_ty_from_tyvar s v2 in
+          match t1 with
+          | FunT (_, t2) ->
+              let d1 =
+                derive_exp (ConsEnv (ConsEnv (tyenv, id1, t12), id2, t1)) e1 t2
+              in
+              let d2 = derive_exp (ConsEnv (tyenv, id1, t12)) e2 ty in
+              TLetRec (tyenv, id1, id2, e1, e2, ty, d1, d2)
+          | _ -> err "Something wrong in derive let rec")
+      | _ -> err "Something wrong in derive let rec")
+  | NilExp -> TNil (tyenv, ty)
+  | ConsExp (e1, e2) -> (
+      match ty with
+      | ListT t ->
+          let d1 = derive_exp tyenv e1 t in
+          let d2 = derive_exp tyenv e2 ty in
+          TCons (tyenv, e1, e2, t, d1, d2)
+      | _ -> err "Type must be list")
+  | MatchExp (e1, e2, id1, id2, e3) -> (
+      let _, tlist, _ = pt tyenv e1 in
+      match tlist with
+      | ListT t ->
+          let d1 = derive_exp tyenv e1 tlist in
+          let d2 = derive_exp tyenv e2 ty in
           let d3 =
-            derive_exp (ConsEnv (ConsEnv (env', id, v1), para, v2)) body v
+            derive_exp (ConsEnv (ConsEnv (tyenv, id1, t), id2, tlist)) e3 ty
           in
-          EAppRec (env, e1, e2, v, d1, d2, d3)
-      | _ -> err "Non-function value is applied")
-  | LetRecExp (id1, id2, e1, e2) ->
-      let d =
-        derive_exp (ConsEnv (env, id1, RecClosure (env, id1, id2, e1))) e2 v
-      in
-      ELetRec (env, id1, id2, e1, e2, v, d)
-  | NilExp -> ENil env
-  | ConsExp (head, tail) -> (
-      match v with
-      | ConsV (vHead, vTail) ->
-          let d1 = derive_exp env head vHead in
-          let d2 = derive_exp env tail vTail in
-          ECons (env, head, tail, vHead, vTail, d1, d2)
-      | _ -> err "Value must be Cons")
-  | MatchExp (e1, e2, head, tail, e3) -> (
-      let v1 = eval_exp env e1 in
-      match v1 with
-      | NilV ->
-          let d1 = derive_exp env e1 v1 in
-          let d2 = derive_exp env e2 v in
-          EMatchNil (env, e1, e2, head, tail, e3, v, d1, d2)
-      | ConsV (vHead, vTail) ->
-          let d1 = derive_exp env e1 v1 in
-          let d2 =
-            derive_exp (ConsEnv (ConsEnv (env, head, vHead), tail, vTail)) e3 v
-          in
-          EMatchCons (env, e1, e2, head, tail, e3, v, d1, d2)
+          TMatch (tyenv, e1, e2, id1, id2, e3, ty, d1, d2, d3)
       | _ -> err "Value after match must be Nil or Cons")
 
 and derive_judgement j =
-  match j with
-  | Eval (env, exp, value) -> derive_exp env exp value
-  | PlusJ (_, _, _) -> BPlus j
-  | MinusJ (_, _, _) -> BMinus j
-  | MultJ (_, _, _) -> BTimes j
-  | LtJ (_, _, _) -> BLt j
+  match j with Typing (tyenv, e, ty) -> derive_exp tyenv e ty
 
 (* n の数だけインデントのための空白を生成する関数 *)
 let rec n_space n = if n = 0 then "" else "  " ^ n_space (n - 1)
 
 (* 導出を出力する関数 *)
 let rec pp_derivation n = function
-  | EInt (env, i, v) ->
+  | TInt (tyenv, i) ->
       let s =
-        n_space n ^ string_of_env env ^ " |- " ^ string_of_int i ^ " evalto "
-        ^ string_of_value v ^ " by E-Int {}"
+        n_space n ^ string_of_tyenv tyenv ^ " |- " ^ string_of_int i
+        ^ " : int by T-Int {}"
       in
       print_string s
-  | EBool (env, b, v) ->
+  | TBool (tyenv, b) ->
       let s =
-        n_space n ^ string_of_env env ^ " |- " ^ string_of_bool b ^ " evalto "
-        ^ string_of_value v ^ " by E-Bool {}"
+        n_space n ^ string_of_tyenv tyenv ^ " |- " ^ string_of_bool b
+        ^ " : bool by T-Bool {}"
       in
       print_string s
-  | EIfT (env, e1, e2, e3, v, d1, d2) ->
+  | TIf (tyenv, e1, e2, e3, ty, d1, d2, d3) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- if " ^ string_of_exp e1 ^ " then "
-        ^ string_of_exp e2 ^ " else " ^ string_of_exp e3 ^ " evalto "
-        ^ string_of_value v ^ " by E-IfT {"
-      in
-      let s2 = n_space n ^ "}" in
-      print_string s1;
-      print_newline ();
-      pp_derivation (n + 1) d1;
-      print_string ";";
-      print_newline ();
-      pp_derivation (n + 1) d2;
-      print_newline ();
-      print_string s2
-  | EIfF (env, e1, e2, e3, v, d1, d2) ->
-      let s1 =
-        n_space n ^ string_of_env env ^ " |- if " ^ string_of_exp e1 ^ " then "
-        ^ string_of_exp e2 ^ " else " ^ string_of_exp e3 ^ " evalto "
-        ^ string_of_value v ^ " by E-IfF {"
-      in
-      let s2 = n_space n ^ "}" in
-      print_string s1;
-      print_newline ();
-      pp_derivation (n + 1) d1;
-      print_string ";";
-      print_newline ();
-      pp_derivation (n + 1) d2;
-      print_newline ();
-      print_string s2
-  | EPlus (env, e1, e2, v, d1, d2, d3) ->
-      let s1 =
-        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp e1 ^ " + "
-        ^ string_of_exp e2 ^ " evalto " ^ string_of_value v ^ " by E-Plus {"
+        n_space n ^ string_of_tyenv tyenv ^ " |- if " ^ string_of_exp e1
+        ^ " then " ^ string_of_exp e2 ^ " else " ^ string_of_exp e3 ^ " : "
+        ^ string_of_ty ty ^ " by T-If {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;
@@ -175,10 +129,10 @@ let rec pp_derivation n = function
       pp_derivation (n + 1) d3;
       print_newline ();
       print_string s2
-  | EMinus (env, e1, e2, v, d1, d2, d3) ->
+  | TPlus (tyenv, e1, e2, d1, d2) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp e1 ^ " - "
-        ^ string_of_exp e2 ^ " evalto " ^ string_of_value v ^ " by E-Minus {"
+        n_space n ^ string_of_tyenv tyenv ^ " |- " ^ string_of_exp e1 ^ " + "
+        ^ string_of_exp e2 ^ " : int by T-Plus {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;
@@ -187,15 +141,12 @@ let rec pp_derivation n = function
       print_string ";";
       print_newline ();
       pp_derivation (n + 1) d2;
-      print_string ";";
-      print_newline ();
-      pp_derivation (n + 1) d3;
       print_newline ();
       print_string s2
-  | ETimes (env, e1, e2, v, d1, d2, d3) ->
+  | TMinus (tyenv, e1, e2, d1, d2) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp e1 ^ " * "
-        ^ string_of_exp e2 ^ " evalto " ^ string_of_value v ^ " by E-Times {"
+        n_space n ^ string_of_tyenv tyenv ^ " |- " ^ string_of_exp e1 ^ " - "
+        ^ string_of_exp e2 ^ " : int by T-Minus {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;
@@ -204,15 +155,12 @@ let rec pp_derivation n = function
       print_string ";";
       print_newline ();
       pp_derivation (n + 1) d2;
-      print_string ";";
-      print_newline ();
-      pp_derivation (n + 1) d3;
       print_newline ();
       print_string s2
-  | ELt (env, e1, e2, v, d1, d2, d3) ->
+  | TTimes (tyenv, e1, e2, d1, d2) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp e1 ^ " < "
-        ^ string_of_exp e2 ^ " evalto " ^ string_of_value v ^ " by E-Lt {"
+        n_space n ^ string_of_tyenv tyenv ^ " |- " ^ string_of_exp e1 ^ " * "
+        ^ string_of_exp e2 ^ " : int by T-Times {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;
@@ -221,22 +169,33 @@ let rec pp_derivation n = function
       print_string ";";
       print_newline ();
       pp_derivation (n + 1) d2;
-      print_string ";";
-      print_newline ();
-      pp_derivation (n + 1) d3;
       print_newline ();
       print_string s2
-  | EVar (env, id, v) ->
+  | TLt (tyenv, e1, e2, d1, d2) ->
+      let s1 =
+        n_space n ^ string_of_tyenv tyenv ^ " |- " ^ string_of_exp e1 ^ " < "
+        ^ string_of_exp e2 ^ " : bool by T-Lt {"
+      in
+      let s2 = n_space n ^ "}" in
+      print_string s1;
+      print_newline ();
+      pp_derivation (n + 1) d1;
+      print_string ";";
+      print_newline ();
+      pp_derivation (n + 1) d2;
+      print_newline ();
+      print_string s2
+  | TVar (tyenv, id, ty) ->
       let s =
-        n_space n ^ string_of_env env ^ " |- " ^ id ^ " evalto "
-        ^ string_of_value v ^ " by E-Var {}"
+        n_space n ^ string_of_tyenv tyenv ^ " |- " ^ id ^ " : "
+        ^ string_of_ty ty ^ " by T-Var {}"
       in
       print_string s
-  | ELet (env, id, e1, e2, v, d1, d2) ->
+  | TLet (tyenv, id, e1, e2, ty, d1, d2) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- let " ^ id ^ " = "
-        ^ string_of_exp e1 ^ " in " ^ string_of_exp e2 ^ " evalto "
-        ^ string_of_value v ^ " by E-Let {"
+        n_space n ^ string_of_tyenv tyenv ^ " |- let " ^ id ^ " = "
+        ^ string_of_exp e1 ^ " in " ^ string_of_exp e2 ^ " : " ^ string_of_ty ty
+        ^ " by T-Let {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;
@@ -247,17 +206,17 @@ let rec pp_derivation n = function
       pp_derivation (n + 1) d2;
       print_newline ();
       print_string s2
-  | EFun (env, id, e) ->
+  | TFun (tyenv, id, e, ty1, ty2, d1) ->
       let s =
-        n_space n ^ string_of_env env ^ " |- fun " ^ id ^ " -> "
-        ^ string_of_exp e ^ " evalto (" ^ string_of_env env ^ ")[fun " ^ id
-        ^ " -> " ^ string_of_exp e ^ "]" ^ " by E-Fun {}"
+        n_space n ^ string_of_tyenv tyenv ^ " |- fun " ^ id ^ " -> "
+        ^ string_of_exp e ^ " : (" ^ string_of_ty ty1 ^ " -> "
+        ^ string_of_ty ty2 ^ ") by T-Fun {}"
       in
       print_string s
-  | EApp (env, e1, e2, v, d1, d2, d3) ->
+  | TApp (tyenv, e1, e2, ty, d1, d2) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp e1 ^ " ("
-        ^ string_of_exp e2 ^ ") evalto " ^ string_of_value v ^ " by E-App {"
+        n_space n ^ string_of_tyenv tyenv ^ " |- " ^ string_of_exp e1 ^ " ("
+        ^ string_of_exp e2 ^ ") evalto " ^ string_of_ty ty ^ " by E-App {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;
@@ -266,27 +225,13 @@ let rec pp_derivation n = function
       print_string ";";
       print_newline ();
       pp_derivation (n + 1) d2;
-      print_string ";";
-      print_newline ();
-      pp_derivation (n + 1) d3;
       print_newline ();
       print_string s2
-  | ELetRec (env, id, para, e1, e2, v, d) ->
+  | TLetRec (tyenv, id, para, e1, e2, ty, d1, d2) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- let rec " ^ id ^ " = fun " ^ para
-        ^ " -> " ^ string_of_exp e1 ^ " in " ^ string_of_exp e2 ^ " evalto "
-        ^ string_of_value v ^ " by E-LetRec {"
-      in
-      let s2 = n_space n ^ "}" in
-      print_string s1;
-      print_newline ();
-      pp_derivation (n + 1) d;
-      print_newline ();
-      print_string s2
-  | EAppRec (env, e1, e2, v, d1, d2, d3) ->
-      let s1 =
-        n_space n ^ string_of_env env ^ " |- " ^ string_of_exp e1 ^ " ("
-        ^ string_of_exp e2 ^ ") evalto " ^ string_of_value v ^ " by E-AppRec {"
+        n_space n ^ string_of_tyenv tyenv ^ " |- let rec " ^ id ^ " = fun "
+        ^ para ^ " -> " ^ string_of_exp e1 ^ " in " ^ string_of_exp e2 ^ " : "
+        ^ string_of_ty ty ^ " by T-LetRec {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;
@@ -295,19 +240,19 @@ let rec pp_derivation n = function
       print_string ";";
       print_newline ();
       pp_derivation (n + 1) d2;
-      print_string ";";
-      print_newline ();
-      pp_derivation (n + 1) d3;
       print_newline ();
       print_string s2
-  | ENil env ->
-      let s = n_space n ^ string_of_env env ^ " |- [] evalto [] by E-Nil {}" in
+  | TNil (tyenv, ty) ->
+      let s =
+        n_space n ^ string_of_tyenv tyenv ^ " |- [] : " ^ string_of_ty ty
+        ^ " list by E-Nil {}"
+      in
       print_string s
-  | ECons (env, head, tail, vHead, vTail, d1, d2) ->
+  | TCons (tyenv, e1, e2, ty, d1, d2) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- (" ^ string_of_exp head ^ ") :: ("
-        ^ string_of_exp tail ^ ") evalto (" ^ string_of_value vHead ^ ") :: ("
-        ^ string_of_value vTail ^ ") by E-Cons {"
+        n_space n ^ string_of_tyenv tyenv ^ " |- (" ^ string_of_exp e1
+        ^ ") :: (" ^ string_of_exp e2 ^ ") : " ^ string_of_ty ty
+        ^ " list by E-Cons {"
       in
       let s2 = n_space n ^ "}" in
       print_string s1;
@@ -318,11 +263,11 @@ let rec pp_derivation n = function
       pp_derivation (n + 1) d2;
       print_newline ();
       print_string s2
-  | EMatchNil (env, e1, e2, head, tail, e3, v, d1, d2) ->
+  | TMatch (tyenv, e1, e2, id1, id2, e3, ty, d1, d2, d3) ->
       let s1 =
-        n_space n ^ string_of_env env ^ " |- match " ^ string_of_exp e1
-        ^ " with [] -> " ^ string_of_exp e2 ^ " | " ^ head ^ " :: " ^ tail
-        ^ " -> " ^ string_of_exp e3 ^ " evalto " ^ string_of_value v
+        n_space n ^ string_of_tyenv tyenv ^ " |- match " ^ string_of_exp e1
+        ^ " with [] -> " ^ string_of_exp e2 ^ " | " ^ id1 ^ " :: " ^ id2
+        ^ " -> " ^ string_of_exp e3 ^ " : " ^ string_of_ty ty
         ^ " by E-MatchNil {"
       in
       let s2 = n_space n ^ "}" in
@@ -334,31 +279,3 @@ let rec pp_derivation n = function
       pp_derivation (n + 1) d2;
       print_newline ();
       print_string s2
-  | EMatchCons (env, e1, e2, head, tail, e3, v, d1, d2) ->
-      let s1 =
-        n_space n ^ string_of_env env ^ " |- match " ^ string_of_exp e1
-        ^ " with [] -> " ^ string_of_exp e2 ^ " | " ^ head ^ " :: " ^ tail
-        ^ " -> " ^ string_of_exp e3 ^ " evalto " ^ string_of_value v
-        ^ " by E-MatchCons {"
-      in
-      let s2 = n_space n ^ "}" in
-      print_string s1;
-      print_newline ();
-      pp_derivation (n + 1) d1;
-      print_string ";";
-      print_newline ();
-      pp_derivation (n + 1) d2;
-      print_newline ();
-      print_string s2
-  | BPlus j ->
-      let s = n_space n ^ string_of_judgement j ^ " by B-Plus {}" in
-      print_string s
-  | BMinus j ->
-      let s = n_space n ^ string_of_judgement j ^ " by B-Minus {}" in
-      print_string s
-  | BTimes j ->
-      let s = n_space n ^ string_of_judgement j ^ " by B-Times {}" in
-      print_string s
-  | BLt j ->
-      let s = n_space n ^ string_of_judgement j ^ " by B-Lt {}" in
-      print_string s

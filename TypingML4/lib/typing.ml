@@ -1,6 +1,6 @@
 open Syntax
 
-(* NOTE: 型代入は (tyvar * ty), 型の等式制約は (ty * ty) で表している *)
+(* NOTE: 型代入は (tyvar * ty)、型の等式制約は (ty * ty) で表している *)
 
 (* 型の等式制約の集合に型代入を適用する関数 *)
 let rec subst_to_equations subst eqs =
@@ -36,64 +36,71 @@ let rec subst_list_to_ty substs ty =
       in
       subst_list_to_ty rest (subst_to_ty (v, t) ty)
 
+(* 型代入から、型変数に対応する型を取得する関数 *)
+let rec get_ty_from_tyvar substs tv =
+  match substs with
+  | [] -> err "The type variable is unbounded."
+  | (v, t) :: rest -> if v = tv then t else get_ty_from_tyvar rest tv
+
 (* 型の等式制約（方程式）を抽出する関数 *)
+(* NOTE: 3つ目の返り値は let rec の導出木用の、式中の変数に対する型変数 *)
 let rec extract tyenv e =
   match e with
-  | IExp _ -> ([], IntT)
-  | BExp _ -> ([], BoolT)
-  | Var v -> ([], lookup v tyenv)
-  | BinOp (p, e1, e2) ->
-      let eq1, ty1 = extract tyenv e1 in
-      let eq2, ty2 = extract tyenv e2 in
+  | IExp _ -> ([], IntT, [])
+  | BExp _ -> ([], BoolT, [])
+  | Var v -> ([], lookup v tyenv, [])
+  | BinOp (op, e1, e2) ->
+      let eq1, ty1, _ = extract tyenv e1 in
+      let eq2, ty2, _ = extract tyenv e2 in
       let eq3 = eq1 @ eq2 @ [ (ty1, IntT); (ty2, IntT) ] in
-      if p = Lt then (eq3, BoolT) else (eq3, IntT)
+      if op = Lt then (eq3, BoolT, []) else (eq3, IntT, [])
   | IfExp (e1, e2, e3) ->
-      let eq1, ty1 = extract tyenv e1 in
-      let eq2, ty2 = extract tyenv e2 in
-      let eq3, ty3 = extract tyenv e3 in
+      let eq1, ty1, _ = extract tyenv e1 in
+      let eq2, ty2, _ = extract tyenv e2 in
+      let eq3, ty3, _ = extract tyenv e3 in
       let eq4 = eq1 @ eq2 @ eq3 @ [ (ty1, BoolT); (ty2, ty3) ] in
-      (eq4, ty2)
+      (eq4, ty2, [])
   | LetExp (id, e1, e2) ->
-      let eq1, ty1 = extract tyenv e1 in
-      let eq2, ty2 = extract (ConsEnv (tyenv, id, ty1)) e2 in
+      let eq1, ty1, _ = extract tyenv e1 in
+      let eq2, ty2, _ = extract (ConsEnv (tyenv, id, ty1)) e2 in
       let eq3 = eq1 @ eq2 in
-      (eq3, ty2)
+      (eq3, ty2, [])
   | FunExp (id, e) ->
       let newty = VarT (fresh_tyvar ()) in
-      let eq, ty0 = extract (ConsEnv (tyenv, id, newty)) e in
-      (eq, FunT (newty, ty0))
+      let eq, ty0, _ = extract (ConsEnv (tyenv, id, newty)) e in
+      (eq, FunT (newty, ty0), [])
   | AppExp (e1, e2) ->
-      let eq1, ty1 = extract tyenv e1 in
-      let eq2, ty2 = extract tyenv e2 in
+      let eq1, ty1, _ = extract tyenv e1 in
+      let eq2, ty2, _ = extract tyenv e2 in
       let newty = VarT (fresh_tyvar ()) in
       let eq3 = eq1 @ eq2 @ [ (ty1, FunT (ty2, newty)) ] in
-      (eq3, newty)
+      (eq3, newty, [])
   | LetRecExp (id1, id2, e1, e2) ->
       let newty1 = VarT (fresh_tyvar ()) in
       let newty2 = VarT (fresh_tyvar ()) in
-      let eq1, ty1 =
+      let eq1, ty1, _ =
         extract (ConsEnv (ConsEnv (tyenv, id1, newty1), id2, newty2)) e1
       in
-      let eq2, ty2 = extract (ConsEnv (tyenv, id1, newty1)) e2 in
+      let eq2, ty2, _ = extract (ConsEnv (tyenv, id1, newty1)) e2 in
       let eq3 = eq1 @ eq2 @ [ (newty1, FunT (newty2, ty1)) ] in
-      (eq3, ty2)
+      (eq3, ty2, [ newty1; newty2 ])
   | NilExp ->
       let newty = VarT (fresh_tyvar ()) in
-      ([], ListT newty)
+      ([], ListT newty, [])
   | ConsExp (e1, e2) ->
-      let eq1, ty1 = extract tyenv e1 in
-      let eq2, ty2 = extract tyenv e2 in
+      let eq1, ty1, _ = extract tyenv e1 in
+      let eq2, ty2, _ = extract tyenv e2 in
       let eq3 = eq1 @ eq2 @ [ (ty2, ListT ty1) ] in
-      (eq3, ty2)
+      (eq3, ty2, [])
   | MatchExp (e1, e2, id1, id2, e3) ->
-      let eq1, ty1 = extract tyenv e1 in
-      let eq2, ty2 = extract tyenv e2 in
+      let eq1, ty1, _ = extract tyenv e1 in
+      let eq2, ty2, _ = extract tyenv e2 in
       let newty = VarT (fresh_tyvar ()) in
-      let eq3, ty3 =
+      let eq3, ty3, _ =
         extract (ConsEnv (ConsEnv (tyenv, id1, newty), id2, ListT newty)) e3
       in
       let eq4 = eq1 @ eq2 @ eq3 @ [ (ty1, ListT newty); (ty2, ty3) ] in
-      (eq4, ty2)
+      (eq4, ty2, [])
 
 (* 単一化を行う関数 *)
 let rec unify eq =
@@ -119,6 +126,6 @@ let rec unify eq =
 
 (* 型推論を行い主要型を求める関数 *)
 let pt tyenv e =
-  let eq, ty = extract tyenv e in
+  let eq, ty, vars = extract tyenv e in
   let s = unify eq in
-  (s, subst_list_to_ty s ty)
+  (s, subst_list_to_ty s ty, vars)
