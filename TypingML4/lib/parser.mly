@@ -8,8 +8,9 @@ open Syntax
 %token LET IN EQ
 %token RARROW FUN
 %token REC
-%token EVALTO VDASH COLUMN LBOX RBOX
+%token VDASH COLUMN
 %token MATCH WITH NIL APPEND BAR
+%token COLON TYINT TYBOOL TYLIST
 
 %token <int> INT
 %token <Syntax.var> ID
@@ -18,10 +19,9 @@ open Syntax
 %type <Syntax.judgement> toplevel
 %%
 
-// NOTE: evalto を使わない判断は扱わないものとする
 toplevel :
-    env=Env VDASH e=Expr EVALTO v=Value SEMISEMI { Eval (env, e, v) }
-  | VDASH e=Expr EVALTO v=Value SEMISEMI { Eval (Empty, e, v) }
+    tyenv=TyEnv VDASH e=Expr COLON ty=Type SEMISEMI { Typing (tyenv, e, ty) }
+  | VDASH e=Expr COLON ty=Type SEMISEMI { Typing (Empty, e, ty) }
 
 Expr :
   e=LTExpr { e }
@@ -76,22 +76,18 @@ AExpr :
   | LPAREN e=Expr RPAREN { e }
   | NIL { NilExp }
 
-Value :
-    v=ConsValue { v }
+Type :
+    ty=FunType { ty }
 
-ConsValue :
-    head=AValue APPEND tail=ConsValue { ConsV (head, tail) }
-  | v=AValue { v }
+FunType :
+    t1=AType RARROW t2=FunType { FunT (t1, t2) }
 
-AValue :
-    i=INT { IntV i }
-  | TRUE   { BoolV true }
-  | FALSE  { BoolV false }
-  | LPAREN env=Env RPAREN LBOX FUN x=ID RARROW e=Expr RBOX { Closure (env, x, e) }
-  | LPAREN env=Env RPAREN LBOX REC x1=ID EQ FUN x2=ID RARROW e=Expr RBOX { RecClosure (env, x1, x2, e) }
-  | NIL { NilV }
-  | LPAREN v=Value RPAREN { v }
+AType :
+    TYINT { IntT }
+  | TYBOOL { BoolT }
+  | ty=Type TYLIST { ListT ty }
+  | LPAREN ty=Type RPAREN { ty }
 
-Env :
-    env=Env COLUMN x=ID EQ v=Value { ConsEnv (env, x, v) }
-  | x=ID EQ v=Value { ConsEnv (Empty, x, v) }
+TyEnv :
+    tyenv=TyEnv COLUMN x=ID COLON ty=Type { ConsEnv (tyenv, x, ty) }
+  | x=ID COLON ty=Type { ConsEnv (Empty, x, ty) }
